@@ -37,7 +37,7 @@ function HistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {q.data?.map((c) => (
+            {q.data?.map((c: any) => (
               <tr key={c.id} className="border-t">
                 <td className="p-2">{new Date(c.started_at).toLocaleString()}</td>
                 <td className="p-2">{c.customer_phone}</td>

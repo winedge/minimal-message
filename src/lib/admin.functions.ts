@@ -65,15 +65,15 @@ export const listAgents = createServerFn({ method: "GET" })
     const { data: sips } = await supabaseAdmin
       .from("sip_endpoints")
       .select("user_id, sip_username, extension");
-    return (profiles ?? []).map((p) => ({
+    return (profiles ?? []).map((p: any) => ({
       ...p,
       role:
-        roles?.find((r) => r.user_id === p.id && r.role === "admin")
+        roles?.find((r: any) => r.user_id === p.id && r.role === "admin")
           ? "admin"
-          : roles?.find((r) => r.user_id === p.id && r.role === "agent")
+          : roles?.find((r: any) => r.user_id === p.id && r.role === "agent")
             ? "agent"
             : null,
-      sip: sips?.find((s) => s.user_id === p.id) ?? null,
+      sip: sips?.find((s: any) => s.user_id === p.id) ?? null,
     }));
   });
 

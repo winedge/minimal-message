@@ -42,7 +42,7 @@ function AllCallsPage() {
             </tr>
           </thead>
           <tbody>
-            {q.data?.map((c) => (
+            {q.data?.map((c: any) => (
               <tr key={c.id} className="border-t">
                 <td className="p-2">{new Date(c.started_at).toLocaleString()}</td>
                 <td className="p-2">{c.agent_id?.slice(0, 8)}</td>
