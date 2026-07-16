@@ -9,38 +9,164 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedDialerRouteImport } from './routes/_authenticated/dialer'
+import { Route as ApiPublicAsteriskEventsRouteImport } from './routes/api/public/asterisk-events'
+import { Route as AuthenticatedAdminLiveRouteImport } from './routes/_authenticated/admin/live'
+import { Route as AuthenticatedAdminFieldsRouteImport } from './routes/_authenticated/admin/fields'
+import { Route as AuthenticatedAdminCallsRouteImport } from './routes/_authenticated/admin/calls'
+import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin/agents'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDialerRoute = AuthenticatedDialerRouteImport.update({
+  id: '/dialer',
+  path: '/dialer',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicAsteriskEventsRoute = ApiPublicAsteriskEventsRouteImport.update({
+  id: '/api/public/asterisk-events',
+  path: '/api/public/asterisk-events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminLiveRoute = AuthenticatedAdminLiveRouteImport.update({
+  id: '/admin/live',
+  path: '/admin/live',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminFieldsRoute =
+  AuthenticatedAdminFieldsRouteImport.update({
+    id: '/admin/fields',
+    path: '/admin/fields',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCallsRoute = AuthenticatedAdminCallsRouteImport.update({
+  id: '/admin/calls',
+  path: '/admin/calls',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminAgentsRoute =
+  AuthenticatedAdminAgentsRouteImport.update({
+    id: '/admin/agents',
+    path: '/admin/agents',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dialer': typeof AuthenticatedDialerRoute
+  '/history': typeof AuthenticatedHistoryRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dialer': typeof AuthenticatedDialerRoute
+  '/history': typeof AuthenticatedHistoryRoute
+  '/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/dialer': typeof AuthenticatedDialerRoute
+  '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
+  '/_authenticated/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/_authenticated/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/_authenticated/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dialer'
+    | '/history'
+    | '/admin/agents'
+    | '/admin/calls'
+    | '/admin/fields'
+    | '/admin/live'
+    | '/api/public/asterisk-events'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/dialer'
+    | '/history'
+    | '/admin/agents'
+    | '/admin/calls'
+    | '/admin/fields'
+    | '/admin/live'
+    | '/api/public/asterisk-events'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/dialer'
+    | '/_authenticated/history'
+    | '/_authenticated/admin/agents'
+    | '/_authenticated/admin/calls'
+    | '/_authenticated/admin/fields'
+    | '/_authenticated/admin/live'
+    | '/api/public/asterisk-events'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  ApiPublicAsteriskEventsRoute: typeof ApiPublicAsteriskEventsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +174,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dialer': {
+      id: '/_authenticated/dialer'
+      path: '/dialer'
+      fullPath: '/dialer'
+      preLoaderRoute: typeof AuthenticatedDialerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/asterisk-events': {
+      id: '/api/public/asterisk-events'
+      path: '/api/public/asterisk-events'
+      fullPath: '/api/public/asterisk-events'
+      preLoaderRoute: typeof ApiPublicAsteriskEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/live': {
+      id: '/_authenticated/admin/live'
+      path: '/admin/live'
+      fullPath: '/admin/live'
+      preLoaderRoute: typeof AuthenticatedAdminLiveRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/fields': {
+      id: '/_authenticated/admin/fields'
+      path: '/admin/fields'
+      fullPath: '/admin/fields'
+      preLoaderRoute: typeof AuthenticatedAdminFieldsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/calls': {
+      id: '/_authenticated/admin/calls'
+      path: '/admin/calls'
+      fullPath: '/admin/calls'
+      preLoaderRoute: typeof AuthenticatedAdminCallsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/agents': {
+      id: '/_authenticated/admin/agents'
+      path: '/admin/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AuthenticatedAdminAgentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDialerRoute: typeof AuthenticatedDialerRoute
+  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedAdminAgentsRoute: typeof AuthenticatedAdminAgentsRoute
+  AuthenticatedAdminCallsRoute: typeof AuthenticatedAdminCallsRoute
+  AuthenticatedAdminFieldsRoute: typeof AuthenticatedAdminFieldsRoute
+  AuthenticatedAdminLiveRoute: typeof AuthenticatedAdminLiveRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDialerRoute: AuthenticatedDialerRoute,
+  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedAdminAgentsRoute: AuthenticatedAdminAgentsRoute,
+  AuthenticatedAdminCallsRoute: AuthenticatedAdminCallsRoute,
+  AuthenticatedAdminFieldsRoute: AuthenticatedAdminFieldsRoute,
+  AuthenticatedAdminLiveRoute: AuthenticatedAdminLiveRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  ApiPublicAsteriskEventsRoute: ApiPublicAsteriskEventsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
