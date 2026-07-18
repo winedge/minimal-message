@@ -122,12 +122,14 @@ function DialerPage() {
           : state === "registered"
             ? "available"
             : "offline";
-      await supabase.from("agent_status").upsert({
+      const { error } = await supabase.from("agent_status").upsert({
         user_id: u.id,
         state: s,
         current_call_id: activeCallId,
         updated_at: new Date().toISOString(),
       });
+      if (error) console.error("[heartbeat] upsert failed:", error);
+      else console.log("[heartbeat] ok state=", s);
     };
     push();
     const t = window.setInterval(push, 10_000);
