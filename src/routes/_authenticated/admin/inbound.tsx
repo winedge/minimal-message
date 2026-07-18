@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteInboundRoute, upsertInboundRoute } from "@/lib/inbound.functions";
+import { listTelnyxNumbers } from "@/lib/telnyx.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/inbound")({
