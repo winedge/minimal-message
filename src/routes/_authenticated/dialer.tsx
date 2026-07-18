@@ -58,11 +58,12 @@ function DialerPage() {
       if (!u) return { count: 0, talkSec: 0, answered: 0 };
       const since = new Date();
       since.setHours(0, 0, 0, 0);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("calls")
         .select("id, duration_sec, status")
         .eq("agent_id", u.id)
         .gte("created_at", since.toISOString());
+      if (error) return { count: 0, talkSec: 0, answered: 0 };
       const rows = data ?? [];
       return {
         count: rows.length,
