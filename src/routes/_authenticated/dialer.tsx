@@ -509,33 +509,51 @@ function DialerPage() {
 
 
 
-      <div className="space-y-4">
+      <div className="lg:order-1">
         <ContactsPanel
           disabled={!!activeChannel}
           onPick={(p) => setPhone(p)}
         />
-        <section className="space-y-4 rounded-lg border p-4">
-          <h2 className="font-semibold">Call notes</h2>
-          {!fields.data?.length && (
-            <p className="text-sm text-muted-foreground">
-              No CRM fields yet. Ask an admin to add fields under CRM fields.
-            </p>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(fields.data ?? []).map((f) => (
-              <FieldInput
-                key={f.id}
-                field={f}
-                value={values[f.key]}
-                onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
-              />
-            ))}
-          </div>
-        </section>
+      </div>
+
+      <section className="space-y-4 rounded-xl border bg-card p-5 lg:order-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Call notes</h2>
+          {inCall && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">Recording notes</span>}
+        </div>
+        {!fields.data?.length && (
+          <p className="text-sm text-muted-foreground">
+            No CRM fields yet. Ask an admin to add fields under CRM fields.
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(fields.data ?? []).map((f) => (
+            <FieldInput
+              key={f.id}
+              field={f}
+              value={values[f.key]}
+              onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+    </div>
+  );
+}
+
+function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
+      <span className="text-muted-foreground">{icon}</span>
+      <div className="leading-tight">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-sm font-semibold tabular-nums">{value}</div>
       </div>
     </div>
   );
 }
+
 
 type ContactRow = {
   id: string;
