@@ -419,13 +419,15 @@ function DialerPage() {
             ) : (
               <>
                 <button
-                  onClick={() => setPhone((p) => p.slice(0, -1))}
-                  disabled={!phone}
-                  className="text-sm text-neutral-400 hover:text-white disabled:opacity-30"
+                  type="button"
+                  onClick={() => setPhone((p) => (p.length > 0 ? p.slice(0, -1) : p))}
+                  className="flex h-12 w-12 items-center justify-center rounded-full text-lg text-neutral-300 hover:bg-neutral-800 hover:text-white active:scale-95"
+                  aria-label="Backspace"
                 >
                   ⌫
                 </button>
                 <button
+                  type="button"
                   onClick={() => dial.mutate()}
                   disabled={!phone || state !== "registered" || dial.isPending}
                   className="flex h-14 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
@@ -433,9 +435,9 @@ function DialerPage() {
                   <Phone className="h-6 w-6" />
                 </button>
                 <button
-                  onClick={() => setPhone("")}
-                  disabled={!phone}
-                  className="text-xs text-neutral-400 hover:text-white disabled:opacity-30"
+                  type="button"
+                  onClick={() => setPhone(DEFAULT_PHONE)}
+                  className="flex h-12 w-12 items-center justify-center rounded-full text-xs text-neutral-300 hover:bg-neutral-800 hover:text-white active:scale-95"
                 >
                   Clear
                 </button>
