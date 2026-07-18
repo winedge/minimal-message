@@ -632,7 +632,7 @@ function ContactsPanel({
           className="pl-8"
         />
       </div>
-      <ul className="max-h-[520px] divide-y overflow-y-auto rounded-lg border">
+      <ul className="max-h-[320px] divide-y overflow-y-auto rounded-lg border lg:max-h-[520px]">
         {rows.map((c) => {
           const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown";
           const initials = name === "Unknown" ? "?" : name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
