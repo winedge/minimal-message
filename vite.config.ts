@@ -11,6 +11,16 @@ const eventsPolyfillPath = fileURLToPath(new URL("./src/lib/browser-events.ts", 
 
 export default defineConfig({
   vite: {
+    plugins: [
+      {
+        name: "browser-events-polyfill",
+        enforce: "pre",
+        resolveId(source) {
+          if (source === "events" || source === "node:events") return eventsPolyfillPath;
+          return null;
+        },
+      },
+    ],
     resolve: {
       alias: [
         // JsSIP depends on Node's `events` name, which must resolve to the
