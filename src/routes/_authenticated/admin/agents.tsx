@@ -71,10 +71,12 @@ function AgentsPage() {
         <h2 className="font-semibold">Create agent</h2>
         {(["fullName", "email", "password", "extension"] as const).map((k) => (
           <div key={k} className="space-y-1">
-            <Label htmlFor={k}>{k}</Label>
+            <Label htmlFor={k}>{k}{k === "extension" ? " (3-6 digits, e.g. 1001)" : ""}</Label>
             <Input
               id={k}
               type={k === "password" ? "password" : k === "email" ? "email" : "text"}
+              inputMode={k === "extension" ? "numeric" : undefined}
+              pattern={k === "extension" ? "\\d{3,6}" : undefined}
               value={form[k]}
               onChange={(e) => setForm({ ...form, [k]: e.target.value })}
             />
