@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
       { title: "Manual Dialer Platform" },
       { name: "description", content: "WebRTC softphone + CRM for outbound dialing with Asterisk & Telnyx." },
       { property: "og:title", content: "Manual Dialer Platform" },
-      { property: "og:description", content: "WebRTC softphone + CRM for outbound dialing." },
+      { property: "og:description", content: "WebRTC softphone + CRM for outbound dialing with Asterisk & Telnyx." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
