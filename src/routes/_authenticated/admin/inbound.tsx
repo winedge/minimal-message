@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteInboundRoute, upsertInboundRoute } from "@/lib/inbound.functions";
+import { listTelnyxNumbers } from "@/lib/telnyx.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/inbound")({
@@ -31,6 +32,7 @@ function InboundPage() {
   const qc = useQueryClient();
   const upsert = useServerFn(upsertInboundRoute);
   const remove = useServerFn(deleteInboundRoute);
+  const fetchTelnyx = useServerFn(listTelnyxNumbers);
 
   const [editing, setEditing] = useState<Partial<Route> | null>(null);
 
@@ -54,6 +56,13 @@ function InboundPage() {
       const allowed = new Set((s ?? []).map((r: any) => r.user_id));
       return (p ?? []).filter((row: any) => allowed.has(row.id)) as Agent[];
     },
+  });
+
+  const telnyxNumbers = useQuery({
+    queryKey: ["telnyx-numbers"],
+    queryFn: () => fetchTelnyx(),
+    staleTime: 60_000,
+    retry: false,
   });
 
   const saveMut = useMutation({
@@ -172,13 +181,45 @@ function InboundPage() {
           <h2 className="font-semibold">{editing.id ? "Edit route" : "New route"}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label>DID (E.164)</Label>
-              <Input
-                placeholder="+15551234567"
-                value={editing.did ?? ""}
-                onChange={(e) => setEditing({ ...editing, did: e.target.value })}
-                required
-              />
+              <Label>DID (from Telnyx)</Label>
+              {telnyxNumbers.isLoading ? (
+                <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
+                  Loading Telnyx numbers…
+                </div>
+              ) : telnyxNumbers.error ? (
+                <>
+                  <Input
+                    placeholder="+15551234567"
+                    value={editing.did ?? ""}
+                    onChange={(e) => setEditing({ ...editing, did: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-destructive">
+                    Telnyx fetch failed: {(telnyxNumbers.error as Error).message}. Enter DID manually.
+                  </p>
+                </>
+              ) : (
+                <select
+                  className="w-full rounded-md border bg-background px-2 py-2 text-sm"
+                  value={editing.did ?? ""}
+                  onChange={(e) => setEditing({ ...editing, did: e.target.value })}
+                  required
+                >
+                  <option value="">— choose number —</option>
+                  {/* keep current value visible even if not in list (e.g. released number) */}
+                  {editing.did &&
+                    !(telnyxNumbers.data ?? []).some((n) => n.phone_number === editing.did) && (
+                      <option value={editing.did}>{editing.did} (not in Telnyx)</option>
+                    )}
+                  {(telnyxNumbers.data ?? []).map((n) => (
+                    <option key={n.phone_number} value={n.phone_number}>
+                      {n.phone_number}
+                      {n.tag ? ` — ${n.tag}` : ""}
+                      {n.status && n.status !== "active" ? ` (${n.status})` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Strategy</Label>
