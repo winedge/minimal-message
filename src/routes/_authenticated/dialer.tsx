@@ -175,141 +175,203 @@ function DialerPage() {
     );
   }
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-      <section className="space-y-4 rounded-lg border p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Softphone</h2>
-          <span className="rounded bg-muted px-2 py-0.5 text-xs uppercase">{state}</span>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="phone">Customer number</Label>
-          <Input
-            id="phone"
-            inputMode="tel"
-            placeholder="+1..."
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={!!activeChannel}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            disabled={!phone || !!activeChannel || state !== "registered"}
-            onClick={() => dial.mutate()}
-          >
-            {dial.isPending ? "Dialing…" : "Dial"}
-          </Button>
-          <Button variant="destructive" disabled={!activeChannel && state !== "in_call"} onClick={endCall}>
-            <PhoneOff className="mr-1 h-4 w-4" /> Hang up
-          </Button>
-        </div>
+  const inCall = state === "in_call" || !!activeChannel;
+  const handleKey = (k: string) => {
+    if (inCall) softphoneRef.current?.sendDtmf(k);
+    else if (!activeChannel) setPhone((p) => p + k);
+  };
+  const statusLabel: Record<SoftphoneState, string> = {
+    idle: "Offline",
+    registering: "Connecting…",
+    registered: "Ready",
+    calling: "Calling…",
+    incoming: "Incoming",
+    in_call: "In call",
+    failed: "Offline",
+  };
+  const statusColor =
+    state === "registered" || state === "in_call"
+      ? "bg-emerald-500"
+      : state === "failed" || state === "idle"
+        ? "bg-red-500"
+        : "bg-amber-500";
 
-        {incoming && (
-          <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
-            <p className="text-sm font-medium">
-              Incoming: {incoming.displayName ?? incoming.from}
-            </p>
-            <div className="mt-2 flex gap-2">
-              <Button size="sm" className="flex-1" onClick={acceptIncoming}>
-                <Phone className="mr-1 h-4 w-4" /> Answer
-              </Button>
-              <Button size="sm" variant="destructive" className="flex-1" onClick={rejectIncoming}>
-                Reject
-              </Button>
+  return (
+    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+      <section className="mx-auto w-full max-w-[340px] space-y-4">
+        {/* Handset */}
+        <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
+          {/* Screen */}
+          <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-4 text-neutral-100">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-neutral-400">
+              <span className="flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
+                {statusLabel[state]}
+              </span>
+              <span>{creds.data?.provisioned ? `ext ${creds.data.extension}` : ""}</span>
+            </div>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Enter number"
+              inputMode="tel"
+              disabled={!!activeChannel}
+              className="mt-3 w-full bg-transparent text-center text-3xl font-light tracking-wider text-white placeholder:text-neutral-600 focus:outline-none"
+            />
+            <div className="mt-1 h-4 text-center text-xs text-neutral-500">
+              {incoming
+                ? `Incoming: ${incoming.displayName ?? incoming.from}`
+                : inCall
+                  ? "Connected"
+                  : ""}
             </div>
           </div>
-        )}
 
-        {/* In-call controls */}
-        <div className="grid grid-cols-3 gap-2">
-          <Button
-            variant={muted ? "default" : "outline"}
-            size="sm"
-            disabled={state !== "in_call"}
-            onClick={() => softphoneRef.current?.toggleMute()}
-          >
-            {muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}
-            {muted ? "Unmute" : "Mute"}
-          </Button>
-          <Button
-            variant={held ? "default" : "outline"}
-            size="sm"
-            disabled={state !== "in_call"}
-            onClick={() => softphoneRef.current?.toggleHold()}
-          >
-            {held ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
-            {held ? "Resume" : "Hold"}
-          </Button>
-          <Button
-            variant={showKeypad ? "default" : "outline"}
-            size="sm"
-            disabled={state !== "in_call"}
-            onClick={() => setShowKeypad((v) => !v)}
-          >
-            Keypad
-          </Button>
-        </div>
-
-        {showKeypad && (
-          <div className="grid grid-cols-3 gap-2">
-            {["1","2","3","4","5","6","7","8","9","*","0","#"].map((k) => (
-              <Button
+          {/* Keypad */}
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              ["1", ""],
+              ["2", "ABC"],
+              ["3", "DEF"],
+              ["4", "GHI"],
+              ["5", "JKL"],
+              ["6", "MNO"],
+              ["7", "PQRS"],
+              ["8", "TUV"],
+              ["9", "WXYZ"],
+              ["*", ""],
+              ["0", "+"],
+              ["#", ""],
+            ].map(([k, sub]) => (
+              <button
                 key={k}
-                variant="outline"
-                onClick={() => softphoneRef.current?.sendDtmf(k)}
+                type="button"
+                onClick={() => handleKey(k)}
+                className="flex h-14 flex-col items-center justify-center rounded-full bg-neutral-800 text-white transition active:scale-95 active:bg-neutral-700"
               >
-                {k}
-              </Button>
+                <span className="text-xl font-medium leading-none">{k}</span>
+                {sub && <span className="mt-0.5 text-[9px] tracking-widest text-neutral-400">{sub}</span>}
+              </button>
             ))}
           </div>
-        )}
 
-        {/* Device selection */}
-        <div className="space-y-2 border-t pt-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Microphone</Label>
-            <select
-              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-              value={inputId}
-              onChange={(e) => {
-                setInputId(e.target.value);
-                softphoneRef.current?.setInputDevice(e.target.value);
-              }}
-            >
-              <option value="">Default</option>
-              {inputs.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
-              ))}
-            </select>
+          {/* Call actions */}
+          <div className="mt-5 flex items-center justify-center gap-4">
+            {incoming ? (
+              <>
+                <button
+                  onClick={rejectIncoming}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
+                >
+                  <PhoneOff className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={acceptIncoming}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg active:scale-95"
+                >
+                  <Phone className="h-6 w-6" />
+                </button>
+              </>
+            ) : inCall ? (
+              <button
+                onClick={endCall}
+                className="flex h-14 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
+              >
+                <PhoneOff className="h-6 w-6" />
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setPhone((p) => p.slice(0, -1))}
+                  disabled={!phone}
+                  className="text-sm text-neutral-400 hover:text-white disabled:opacity-30"
+                >
+                  ⌫
+                </button>
+                <button
+                  onClick={() => dial.mutate()}
+                  disabled={!phone || state !== "registered" || dial.isPending}
+                  className="flex h-14 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
+                >
+                  <Phone className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={() => setPhone("")}
+                  disabled={!phone}
+                  className="text-xs text-neutral-400 hover:text-white disabled:opacity-30"
+                >
+                  Clear
+                </button>
+              </>
+            )}
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Speaker</Label>
-            <select
-              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-              value={outputId}
-              onChange={(e) => {
-                setOutputId(e.target.value);
-                softphoneRef.current?.setOutputDevice(e.target.value);
-              }}
-            >
-              <option value="">Default</option>
-              {outputs.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
-              ))}
-            </select>
-          </div>
+
+          {/* In-call mute/hold */}
+          {inCall && (
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                onClick={() => softphoneRef.current?.toggleMute()}
+                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs ${muted ? "bg-white text-neutral-900" : "bg-neutral-800 text-white"}`}
+              >
+                {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                {muted ? "Unmute" : "Mute"}
+              </button>
+              <button
+                onClick={() => softphoneRef.current?.toggleHold()}
+                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs ${held ? "bg-white text-neutral-900" : "bg-neutral-800 text-white"}`}
+              >
+                {held ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                {held ? "Resume" : "Hold"}
+              </button>
+            </div>
+          )}
         </div>
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <div className="space-y-2 border-t pt-3">
-          <Button type="button" variant="outline" size="sm" onClick={runWsProbe}>
-            Test PBX WebSocket
-          </Button>
-          {wsProbe && <p className="break-words text-xs text-muted-foreground">{wsProbe}</p>}
-        </div>
+        {/* Devices + diagnostics */}
+        <details className="rounded-lg border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Audio & diagnostics</summary>
+          <div className="mt-3 space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Microphone</Label>
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={inputId}
+                onChange={(e) => {
+                  setInputId(e.target.value);
+                  softphoneRef.current?.setInputDevice(e.target.value);
+                }}
+              >
+                <option value="">Default</option>
+                {inputs.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Speaker</Label>
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                value={outputId}
+                onChange={(e) => {
+                  setOutputId(e.target.value);
+                  softphoneRef.current?.setOutputDevice(e.target.value);
+                }}
+              >
+                <option value="">Default</option>
+                {outputs.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+                ))}
+              </select>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={runWsProbe}>
+              Test PBX WebSocket
+            </Button>
+            {wsProbe && <p className="break-words text-xs text-muted-foreground">{wsProbe}</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+        </details>
       </section>
+
 
 
       <section className="space-y-4 rounded-lg border p-4">
