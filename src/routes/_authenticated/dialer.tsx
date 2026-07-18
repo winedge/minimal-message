@@ -455,8 +455,15 @@ function DialerPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => dial.mutate()}
-                  disabled={!phone || state !== "registered" || dial.isPending}
+                  onClick={() => {
+                    if (!phone) return;
+                    if (state !== "registered") {
+                      toast.error(`Softphone not ready (state: ${state}). Check WebSocket registration.`);
+                      return;
+                    }
+                    dial.mutate();
+                  }}
+                  disabled={!phone || dial.isPending}
                   className="flex h-14 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
                 >
                   <Phone className="h-6 w-6" />
