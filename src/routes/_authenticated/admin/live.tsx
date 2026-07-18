@@ -68,10 +68,12 @@ function LivePage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "agent_status" }, loadAll)
       .on("postgres_changes", { event: "*", schema: "public", table: "calls" }, loadAll)
       .subscribe();
+    const refresh = window.setInterval(loadAll, 5_000);
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
       alive = false;
       supabase.removeChannel(ch);
+      clearInterval(refresh);
       clearInterval(t);
     };
   }, [role]);

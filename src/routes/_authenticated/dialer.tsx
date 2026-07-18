@@ -67,6 +67,11 @@ function DialerPage() {
   const [showKeypad, setShowKeypad] = useState(false);
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
+  const presenceRef = useRef({ state, activeChannel, activeCallId });
+
+  useEffect(() => {
+    presenceRef.current = { state, activeChannel, activeCallId };
+  }, [state, activeChannel, activeCallId]);
 
   useEffect(() => {
     if (!creds.data || creds.data.provisioned === false) return;
@@ -110,38 +115,42 @@ function DialerPage() {
     }
   }, [state]);
 
-  // Heartbeat presence
-  useEffect(() => {
-    let cancelled = false;
-    const push = async () => {
+  const pushPresence = useCallback(async (forceOffline = false) => {
       const u = (await supabase.auth.getUser()).data.user;
-      if (!u || cancelled) return;
+      if (!u) return;
+      const current = presenceRef.current;
       const s =
-        state === "in_call" || activeChannel
+        forceOffline
+          ? "offline"
+          : current.state === "in_call" || current.activeChannel
           ? "on_call"
-          : state === "registered"
+          : current.state === "registered"
             ? "available"
             : "offline";
       const { error } = await supabase.from("agent_status").upsert({
         user_id: u.id,
         state: s,
-        current_call_id: activeCallId,
+        current_call_id: forceOffline ? null : current.activeCallId,
         updated_at: new Date().toISOString(),
       });
       if (error) console.error("[heartbeat] upsert failed:", error);
       else console.log("[heartbeat] ok state=", s);
+  }, []);
+
+  // Heartbeat presence
+  useEffect(() => {
+    void pushPresence();
+  }, [state, activeChannel, activeCallId, pushPresence]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const push = () => {
+      if (!cancelled) void pushPresence();
     };
     push();
     const t = window.setInterval(push, 10_000);
-    const offline = async () => {
-      const u = (await supabase.auth.getUser()).data.user;
-      if (!u) return;
-      await supabase.from("agent_status").upsert({
-        user_id: u.id,
-        state: "offline",
-        current_call_id: null,
-        updated_at: new Date().toISOString(),
-      });
+    const offline = () => {
+      void pushPresence(true);
     };
     window.addEventListener("beforeunload", offline);
     return () => {
@@ -150,7 +159,7 @@ function DialerPage() {
       window.removeEventListener("beforeunload", offline);
       offline();
     };
-  }, [state, activeChannel, activeCallId]);
+  }, [pushPresence]);
 
 
   const acceptIncoming = useCallback(() => {
