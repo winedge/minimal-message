@@ -235,6 +235,7 @@ function DialerPage() {
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onMutate: () => {
+      pendingOutboundRef.current = true;
       setDialMessage("Sending call to Asterisk…");
       toast.info("Starting call…");
     },
@@ -246,6 +247,7 @@ function DialerPage() {
       toast.success("Dialing…");
     },
     onError: (e: any) => {
+      pendingOutboundRef.current = false;
       const msg = e.message ?? "Call failed";
       setDialMessage(msg);
       toast.error(msg);
