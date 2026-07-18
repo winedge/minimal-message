@@ -101,6 +101,7 @@ function DialerPage() {
   const [nowTick, setNowTick] = useState(0);
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const [dialMessage, setDialMessage] = useState<string | null>(null);
+  const [outboundDialing, setOutboundDialing] = useState(false);
   const softphoneRef = useRef<Softphone | null>(null);
   const pendingOutboundRef = useRef(false);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
@@ -120,15 +121,31 @@ function DialerPage() {
       },
       onIncoming: (info) => {
         // If we just initiated an outbound originate, Asterisk calls the agent
-        // endpoint first (appears as incoming). Auto-answer and don't show the
-        // incoming UI.
+        // endpoint first. Auto-answer it and keep the UI in outbound mode.
         if (pendingOutboundRef.current) {
           pendingOutboundRef.current = false;
-          setTimeout(() => softphoneRef.current?.answer(), 0);
-          return;
+          setIncoming(null);
+          setOutboundDialing(true);
+          return "auto-answer";
         }
         setIncoming(info);
+        setOutboundDialing(false);
         toast.info(`Incoming call from ${info.displayName ?? info.from}`);
+      },
+      onEnded: () => {
+        pendingOutboundRef.current = false;
+        setOutboundDialing(false);
+        setActiveChannel(null);
+        setActiveCallId(null);
+        setIncoming(null);
+        setDialMessage(null);
+        setShowKeypad(false);
+        setCallStartedAt(null);
+        setMuted(false);
+        setHeld(false);
+        setPhone(DEFAULT_PHONE);
+        void qc.invalidateQueries({ queryKey: ["history"] });
+        void qc.invalidateQueries({ queryKey: ["dialer-today"] });
       },
       onMuteChange: setMuted,
       onHoldChange: setHeld,
@@ -157,8 +174,13 @@ function DialerPage() {
       setIncoming(null);
       setShowKeypad(false);
       setCallStartedAt(null);
+      setOutboundDialing(false);
+      pendingOutboundRef.current = false;
     }
-    if (state === "in_call" && !callStartedAt) setCallStartedAt(Date.now());
+    if (state === "in_call") {
+      setOutboundDialing(false);
+      if (!callStartedAt) setCallStartedAt(Date.now());
+    }
   }, [state, callStartedAt]);
 
   useEffect(() => {
@@ -236,6 +258,8 @@ function DialerPage() {
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onMutate: () => {
       pendingOutboundRef.current = true;
+      setOutboundDialing(true);
+      setIncoming(null);
       setDialMessage("Sending call to Asterisk…");
       toast.info("Starting call…");
     },
@@ -248,6 +272,7 @@ function DialerPage() {
     },
     onError: (e: any) => {
       pendingOutboundRef.current = false;
+      setOutboundDialing(false);
       const msg = e.message ?? "Call failed";
       setDialMessage(msg);
       toast.error(msg);
@@ -256,6 +281,8 @@ function DialerPage() {
   });
 
   async function endCall() {
+    pendingOutboundRef.current = false;
+    setOutboundDialing(false);
     if (activeChannel) await hangup({ data: { channelId: activeChannel } });
     softphoneRef.current?.hangup();
     // Save CRM entry
@@ -276,7 +303,14 @@ function DialerPage() {
     }
     setActiveChannel(null);
     setActiveCallId(null);
+    setIncoming(null);
+    setDialMessage(null);
+    setShowKeypad(false);
+    setCallStartedAt(null);
+    setMuted(false);
+    setHeld(false);
     setPhone(DEFAULT_PHONE);
+    setState((s) => (s === "failed" || s === "idle" ? s : "registered"));
     qc.invalidateQueries({ queryKey: ["history"] });
     qc.invalidateQueries({ queryKey: ["dialer-today"] });
   }
@@ -349,6 +383,11 @@ function DialerPage() {
         : "bg-amber-500";
 
   const stats = todayStats.data ?? { count: 0, talkSec: 0, answered: 0 };
+  const visibleStatusLabel = outboundDialing && !incoming
+    ? state === "in_call"
+      ? "In call"
+      : "Calling…"
+    : statusLabel[state];
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -360,7 +399,7 @@ function DialerPage() {
             <span className={`relative inline-flex h-3 w-3 rounded-full ${statusColor}`} />
           </span>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold leading-tight">{statusLabel[state]}</div>
+            <div className="truncate text-sm font-semibold leading-tight">{visibleStatusLabel}</div>
             <div className="truncate text-xs text-muted-foreground">
               {creds.data?.provisioned ? `Ext ${creds.data.extension}` : "Not provisioned"}
               {inCall && phone ? ` · ${phone}` : ""}
@@ -380,7 +419,7 @@ function DialerPage() {
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
           {(() => {
-            const callView = incoming || inCall || state === "calling" || dial.isPending;
+            const callView = incoming || inCall || state === "calling" || dial.isPending || outboundDialing;
             const elapsedSec = callStartedAt ? Math.floor((Date.now() - callStartedAt) / 1000) : 0;
             void nowTick;
             const callStatusText = incoming
