@@ -286,9 +286,35 @@ function DialerPage() {
         ? "bg-red-500"
         : "bg-amber-500";
 
+  const stats = todayStats.data ?? { count: 0, talkSec: 0, answered: 0 };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <section className="mx-auto w-full max-w-[340px] space-y-4">
+    <div className="space-y-6">
+      {/* Top status bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
+        <div className="flex items-center gap-3">
+          <span className={`relative flex h-3 w-3`}>
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${statusColor}`} />
+            <span className={`relative inline-flex h-3 w-3 rounded-full ${statusColor}`} />
+          </span>
+          <div>
+            <div className="text-sm font-semibold leading-tight">{statusLabel[state]}</div>
+            <div className="text-xs text-muted-foreground">
+              {creds.data?.provisioned ? `Extension ${creds.data.extension}` : "Not provisioned"}
+              {inCall && phone ? ` · ${phone}` : ""}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <StatChip icon={<PhoneCall className="h-3.5 w-3.5" />} label="Calls today" value={String(stats.count)} />
+          <StatChip icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Answered" value={String(stats.answered)} />
+          <StatChip icon={<Clock className="h-3.5 w-3.5" />} label="Talk time" value={fmtDuration(stats.talkSec)} />
+        </div>
+      </div>
+
+    <div className="grid gap-6 lg:grid-cols-[280px_360px_1fr]">
+      <section className="mx-auto w-full max-w-[340px] space-y-4 lg:order-2">
+
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
           {/* Screen */}
