@@ -267,7 +267,7 @@ function DialerPage() {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
       setValues({});
-      setDialMessage("Asterisk accepted the call. Your softphone should ring now.");
+      setDialMessage(null);
       toast.success("Dialing…");
     },
     onError: (e: any) => {
