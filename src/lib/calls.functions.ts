@@ -33,7 +33,12 @@ export const getSipCredentials = createServerFn({ method: "GET" })
 export const originateCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({ customerPhone: z.string().trim().min(3).max(32) }).parse(input),
+    z
+      .object({
+        customerPhone: z.string().trim().min(3).max(32),
+        outboundDidId: z.string().uuid().optional().nullable(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const ariUrl = process.env.ASTERISK_ARI_URL;
