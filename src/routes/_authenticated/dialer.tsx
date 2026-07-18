@@ -360,163 +360,212 @@ function DialerPage() {
 
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
-          {/* Screen */}
-          <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-4 text-neutral-100">
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-neutral-400">
-              <span className="flex items-center gap-1.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
-                {statusLabel[state]}
-              </span>
-              <span>{creds.data?.provisioned ? `ext ${creds.data.extension}` : ""}</span>
-            </div>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Enter number"
-              inputMode="tel"
-              disabled={!!activeChannel}
-              className="mt-3 w-full bg-transparent text-center text-3xl font-light tracking-wider text-white placeholder:text-neutral-600 focus:outline-none"
-            />
-            <div className="mt-1 h-4 text-center text-xs text-neutral-500">
-              {incoming
-                ? `Incoming: ${incoming.displayName ?? incoming.from}`
-                : inCall
-                  ? "Connected"
-                  : ""}
-            </div>
-            {(outboundDids.data?.length ?? 0) > 0 && !inCall && (
-              <div className="mt-2 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-neutral-400">
-                <span>Caller ID</span>
-                <select
-                  className="rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-100 focus:outline-none"
-                  value={outboundDidId}
-                  onChange={(e) => setOutboundDidId(e.target.value)}
-                >
-                  <option value="">
-                    {outboundDids.data?.find((d: any) => d.is_default)?.phone_number ?? "default"}
-                  </option>
-                  {outboundDids.data?.map((d: any) => (
-                    <option key={d.id} value={d.id}>
-                      {d.phone_number}{d.label ? ` — ${d.label}` : ""}
-                    </option>
+          {(() => {
+            const callView = incoming || inCall || state === "calling" || dial.isPending;
+            const elapsedSec = callStartedAt ? Math.floor((Date.now() - callStartedAt) / 1000) : 0;
+            void nowTick;
+            const callStatusText = incoming
+              ? "Incoming call"
+              : state === "in_call"
+                ? held ? "On hold" : "Connected"
+                : "Calling…";
+
+            if (callView) {
+              return (
+                <>
+                  {/* Call screen */}
+                  <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-6 text-center text-neutral-100">
+                    <div className="text-[10px] uppercase tracking-widest text-neutral-400">{callStatusText}</div>
+                    <div className="mt-4 text-3xl font-light tracking-wider text-white">
+                      {incoming ? (incoming.displayName ?? incoming.from) : phone}
+                    </div>
+                    <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
+                      {state === "in_call" ? fmtDuration(elapsedSec) : incoming ? "Ringing…" : "Dialing…"}
+                    </div>
+                  </div>
+
+                  {/* In-call DTMF keypad (toggle) */}
+                  {showKeypad && inCall && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {[
+                        ["1", ""], ["2", "ABC"], ["3", "DEF"],
+                        ["4", "GHI"], ["5", "JKL"], ["6", "MNO"],
+                        ["7", "PQRS"], ["8", "TUV"], ["9", "WXYZ"],
+                        ["*", ""], ["0", "+"], ["#", ""],
+                      ].map(([k, sub]) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => handleKey(k)}
+                          className="flex h-14 flex-col items-center justify-center rounded-full bg-neutral-800 text-white transition active:scale-95 active:bg-neutral-700"
+                        >
+                          <span className="text-xl font-medium leading-none">{k}</span>
+                          {sub && <span className="mt-0.5 text-[9px] tracking-widest text-neutral-400">{sub}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* In-call control row */}
+                  {inCall && (
+                    <div className="mt-5 grid grid-cols-3 gap-3">
+                      <CircleAction
+                        active={muted}
+                        onClick={() => softphoneRef.current?.toggleMute()}
+                        icon={muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                        label={muted ? "Unmute" : "Mute"}
+                      />
+                      <CircleAction
+                        active={showKeypad}
+                        onClick={() => setShowKeypad((s) => !s)}
+                        icon={<Grid3x3 className="h-5 w-5" />}
+                        label="Keypad"
+                      />
+                      <CircleAction
+                        active={held}
+                        onClick={() => softphoneRef.current?.toggleHold()}
+                        icon={held ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+                        label={held ? "Resume" : "Hold"}
+                      />
+                    </div>
+                  )}
+
+                  {/* Bottom action */}
+                  <div className="mt-6 flex items-center justify-center gap-6">
+                    {incoming ? (
+                      <>
+                        <button
+                          onClick={rejectIncoming}
+                          className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
+                          aria-label="Reject"
+                        >
+                          <PhoneOff className="h-7 w-7" />
+                        </button>
+                        <button
+                          onClick={acceptIncoming}
+                          className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg active:scale-95"
+                          aria-label="Answer"
+                        >
+                          <Phone className="h-7 w-7" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={endCall}
+                        className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
+                        aria-label="End call"
+                      >
+                        <PhoneOff className="h-7 w-7" />
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            }
+
+            // Idle dialer view
+            return (
+              <>
+                <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-4 text-neutral-100">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-neutral-400">
+                    <span className="flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
+                      {statusLabel[state]}
+                    </span>
+                    <span>{creds.data?.provisioned ? `ext ${creds.data.extension}` : ""}</span>
+                  </div>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter number"
+                    inputMode="tel"
+                    className="mt-3 w-full bg-transparent text-center text-3xl font-light tracking-wider text-white placeholder:text-neutral-600 focus:outline-none"
+                  />
+                  <div className="mt-1 h-4" />
+                  {(outboundDids.data?.length ?? 0) > 0 && (
+                    <div className="mt-2 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-neutral-400">
+                      <span>Caller ID</span>
+                      <select
+                        className="rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-100 focus:outline-none"
+                        value={outboundDidId}
+                        onChange={(e) => setOutboundDidId(e.target.value)}
+                      >
+                        <option value="">
+                          {outboundDids.data?.find((d: any) => d.is_default)?.phone_number ?? "default"}
+                        </option>
+                        {outboundDids.data?.map((d: any) => (
+                          <option key={d.id} value={d.id}>
+                            {d.phone_number}{d.label ? ` — ${d.label}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Keypad */}
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[
+                    ["1", ""], ["2", "ABC"], ["3", "DEF"],
+                    ["4", "GHI"], ["5", "JKL"], ["6", "MNO"],
+                    ["7", "PQRS"], ["8", "TUV"], ["9", "WXYZ"],
+                    ["*", ""], ["0", "+"], ["#", ""],
+                  ].map(([k, sub]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => handleKey(k)}
+                      className="flex h-14 flex-col items-center justify-center rounded-full bg-neutral-800 text-white transition active:scale-95 active:bg-neutral-700"
+                    >
+                      <span className="text-xl font-medium leading-none">{k}</span>
+                      {sub && <span className="mt-0.5 text-[9px] tracking-widest text-neutral-400">{sub}</span>}
+                    </button>
                   ))}
-                </select>
-              </div>
-            )}
-          </div>
+                </div>
 
-          {/* Keypad */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[
-              ["1", ""],
-              ["2", "ABC"],
-              ["3", "DEF"],
-              ["4", "GHI"],
-              ["5", "JKL"],
-              ["6", "MNO"],
-              ["7", "PQRS"],
-              ["8", "TUV"],
-              ["9", "WXYZ"],
-              ["*", ""],
-              ["0", "+"],
-              ["#", ""],
-            ].map(([k, sub]) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => handleKey(k)}
-                className="flex h-14 flex-col items-center justify-center rounded-full bg-neutral-800 text-white transition active:scale-95 active:bg-neutral-700"
-              >
-                <span className="text-xl font-medium leading-none">{k}</span>
-                {sub && <span className="mt-0.5 text-[9px] tracking-widest text-neutral-400">{sub}</span>}
-              </button>
-            ))}
-          </div>
-
-          {/* Call actions */}
-          <div className="mt-5 flex items-center justify-center gap-4">
-            {incoming ? (
-              <>
-                <button
-                  onClick={rejectIncoming}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
-                >
-                  <PhoneOff className="h-6 w-6" />
-                </button>
-                <button
-                  onClick={acceptIncoming}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg active:scale-95"
-                >
-                  <Phone className="h-6 w-6" />
-                </button>
+                {/* Dial actions */}
+                <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setPhone(DEFAULT_PHONE)}
+                    className="justify-self-end text-xs text-neutral-400 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log("[dial] click", { phone, state, pending: dial.isPending });
+                      if (!phone) {
+                        toast.error("Enter a number first");
+                        return;
+                      }
+                      if (dial.isPending) return;
+                      if (state !== "registered") {
+                        toast.warning(`Softphone state: ${state}. Attempting call anyway…`);
+                      }
+                      dial.mutate();
+                    }}
+                    disabled={!phone || dial.isPending}
+                    className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
+                    aria-label="Call"
+                  >
+                    <Phone className="h-7 w-7" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhone((p) => (p.length > DEFAULT_PHONE.length ? p.slice(0, -1) : DEFAULT_PHONE))}
+                    className="justify-self-start flex h-10 w-10 items-center justify-center rounded-full text-neutral-300 hover:bg-neutral-800 hover:text-white active:scale-95"
+                    aria-label="Backspace"
+                  >
+                    <Delete className="h-5 w-5" />
+                  </button>
+                </div>
               </>
-            ) : inCall ? (
-              <button
-                onClick={endCall}
-                className="flex h-14 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-lg active:scale-95"
-              >
-                <PhoneOff className="h-6 w-6" />
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setPhone((p) => (p.length > 0 ? p.slice(0, -1) : p))}
-                  className="flex h-12 w-12 items-center justify-center rounded-full text-lg text-neutral-300 hover:bg-neutral-800 hover:text-white active:scale-95"
-                  aria-label="Backspace"
-                >
-                  ⌫
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    console.log("[dial] click", { phone, state, pending: dial.isPending });
-                    if (!phone) {
-                      toast.error("Enter a number first");
-                      return;
-                    }
-                    if (dial.isPending) return;
-                    if (state !== "registered") {
-                      toast.warning(`Softphone state: ${state}. Attempting call anyway…`);
-                    }
-                    dial.mutate();
-                  }}
-                  disabled={!phone || dial.isPending}
-                  className="flex h-14 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
-                >
-                  <Phone className="h-6 w-6" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPhone(DEFAULT_PHONE)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full text-xs text-neutral-300 hover:bg-neutral-800 hover:text-white active:scale-95"
-                >
-                  Clear
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* In-call mute/hold */}
-          {inCall && (
-            <div className="mt-4 flex justify-center gap-2">
-              <button
-                onClick={() => softphoneRef.current?.toggleMute()}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs ${muted ? "bg-white text-neutral-900" : "bg-neutral-800 text-white"}`}
-              >
-                {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                {muted ? "Unmute" : "Mute"}
-              </button>
-              <button
-                onClick={() => softphoneRef.current?.toggleHold()}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs ${held ? "bg-white text-neutral-900" : "bg-neutral-800 text-white"}`}
-              >
-                {held ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                {held ? "Resume" : "Hold"}
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
+
 
         {/* Devices + diagnostics */}
         <details className="rounded-lg border p-3 text-sm">
