@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { Softphone, type SoftphoneState } from "@/lib/softphone";
+import { Softphone, type SoftphoneState, type IncomingCallInfo } from "@/lib/softphone";
 import { getSipCredentials, originateCall, hangupCall } from "@/lib/calls.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Mic, MicOff, Pause, Play, PhoneOff, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dialer")({
   head: () => ({ meta: [{ title: "Dialer" }] }),
@@ -51,6 +52,14 @@ function DialerPage() {
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>({});
+  const [muted, setMuted] = useState(false);
+  const [held, setHeld] = useState(false);
+  const [incoming, setIncoming] = useState<IncomingCallInfo | null>(null);
+  const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
+  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [inputId, setInputId] = useState<string>("");
+  const [outputId, setOutputId] = useState<string>("");
+  const [showKeypad, setShowKeypad] = useState(false);
   const softphoneRef = useRef<Softphone | null>(null);
 
   useEffect(() => {
@@ -62,6 +71,12 @@ function DialerPage() {
         setError(m);
         toast.error(m);
       },
+      onIncoming: (info) => {
+        setIncoming(info);
+        toast.info(`Incoming call from ${info.displayName ?? info.from}`);
+      },
+      onMuteChange: setMuted,
+      onHoldChange: setHeld,
     });
     softphoneRef.current = sp;
     sp.register({
@@ -70,11 +85,34 @@ function DialerPage() {
       wssUrl: c.wssUrl,
       sipDomain: c.sipDomain,
     });
+    sp.listDevices().then(({ inputs, outputs }) => {
+      setInputs(inputs);
+      setOutputs(outputs);
+    });
     return () => {
       sp.stop();
       softphoneRef.current = null;
     };
   }, [creds.data]);
+
+  useEffect(() => {
+    if (state === "registered") {
+      setMuted(false);
+      setHeld(false);
+      setIncoming(null);
+      setShowKeypad(false);
+    }
+  }, [state]);
+
+  const acceptIncoming = useCallback(() => {
+    softphoneRef.current?.answer();
+    setIncoming(null);
+  }, []);
+  const rejectIncoming = useCallback(() => {
+    softphoneRef.current?.reject();
+    setIncoming(null);
+  }, []);
+
 
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone } }),
@@ -149,12 +187,110 @@ function DialerPage() {
           >
             {dial.isPending ? "Dialing…" : "Dial"}
           </Button>
-          <Button variant="destructive" disabled={!activeChannel} onClick={endCall}>
-            Hang up
+          <Button variant="destructive" disabled={!activeChannel && state !== "in_call"} onClick={endCall}>
+            <PhoneOff className="mr-1 h-4 w-4" /> Hang up
           </Button>
         </div>
+
+        {incoming && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+            <p className="text-sm font-medium">
+              Incoming: {incoming.displayName ?? incoming.from}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" className="flex-1" onClick={acceptIncoming}>
+                <Phone className="mr-1 h-4 w-4" /> Answer
+              </Button>
+              <Button size="sm" variant="destructive" className="flex-1" onClick={rejectIncoming}>
+                Reject
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* In-call controls */}
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            variant={muted ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => softphoneRef.current?.toggleMute()}
+          >
+            {muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}
+            {muted ? "Unmute" : "Mute"}
+          </Button>
+          <Button
+            variant={held ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => softphoneRef.current?.toggleHold()}
+          >
+            {held ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
+            {held ? "Resume" : "Hold"}
+          </Button>
+          <Button
+            variant={showKeypad ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => setShowKeypad((v) => !v)}
+          >
+            Keypad
+          </Button>
+        </div>
+
+        {showKeypad && (
+          <div className="grid grid-cols-3 gap-2">
+            {["1","2","3","4","5","6","7","8","9","*","0","#"].map((k) => (
+              <Button
+                key={k}
+                variant="outline"
+                onClick={() => softphoneRef.current?.sendDtmf(k)}
+              >
+                {k}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Device selection */}
+        <div className="space-y-2 border-t pt-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Microphone</Label>
+            <select
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={inputId}
+              onChange={(e) => {
+                setInputId(e.target.value);
+                softphoneRef.current?.setInputDevice(e.target.value);
+              }}
+            >
+              <option value="">Default</option>
+              {inputs.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Speaker</Label>
+            <select
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={outputId}
+              onChange={(e) => {
+                setOutputId(e.target.value);
+                softphoneRef.current?.setOutputDevice(e.target.value);
+              }}
+            >
+              <option value="">Default</option>
+              {outputs.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {error && <p className="text-xs text-destructive">{error}</p>}
       </section>
+
 
       <section className="space-y-4 rounded-lg border p-4">
         <h2 className="font-semibold">Call notes</h2>
