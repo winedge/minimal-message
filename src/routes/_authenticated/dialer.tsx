@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { Softphone, type SoftphoneState } from "@/lib/softphone";
+import { Softphone, type SoftphoneState, type IncomingCallInfo } from "@/lib/softphone";
 import { getSipCredentials, originateCall, hangupCall } from "@/lib/calls.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Mic, MicOff, Pause, Play, PhoneOff, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dialer")({
   head: () => ({ meta: [{ title: "Dialer" }] }),
