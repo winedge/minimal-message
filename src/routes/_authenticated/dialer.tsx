@@ -272,6 +272,33 @@ function DialerPage() {
     if (inCall) softphoneRef.current?.sendDtmf(k);
     else if (!activeChannel) setPhone((p) => p + k);
   };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t as any)?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key;
+      if (/^[0-9*#]$/.test(k)) {
+        e.preventDefault();
+        handleKey(k);
+      } else if (k === "+") {
+        e.preventDefault();
+        if (!inCall && !activeChannel) setPhone((p) => p + "+");
+      } else if (k === "Backspace") {
+        e.preventDefault();
+        if (!inCall && !activeChannel) setPhone((p) => p.slice(0, -1));
+      } else if (k === "Enter") {
+        if (!inCall && !activeChannel && phone && state === "registered" && !dial.isPending) {
+          e.preventDefault();
+          dial.mutate();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [inCall, activeChannel, phone, state, dial]);
   const statusLabel: Record<SoftphoneState, string> = {
     idle: "Offline",
     registering: "Connecting…",
