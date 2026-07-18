@@ -60,14 +60,14 @@ function DialerPage() {
       since.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("calls")
-        .select("id, duration_sec, status")
+        .select("id, duration, status")
         .eq("agent_id", u.id)
-        .gte("created_at", since.toISOString());
+        .gte("started_at", since.toISOString());
       if (error) return { count: 0, talkSec: 0, answered: 0 };
       const rows = data ?? [];
       return {
         count: rows.length,
-        talkSec: rows.reduce((a: number, r: any) => a + (r.duration_sec ?? 0), 0),
+        talkSec: rows.reduce((a: number, r: any) => a + (r.duration ?? 0), 0),
         answered: rows.filter((r: any) => r.status === "answered" || r.status === "ended").length,
       };
     },
