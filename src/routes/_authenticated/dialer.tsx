@@ -456,10 +456,14 @@ function DialerPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!phone) return;
-                    if (state !== "registered") {
-                      toast.error(`Softphone not ready (state: ${state}). Check WebSocket registration.`);
+                    console.log("[dial] click", { phone, state, pending: dial.isPending });
+                    if (!phone) {
+                      toast.error("Enter a number first");
                       return;
+                    }
+                    if (dial.isPending) return;
+                    if (state !== "registered") {
+                      toast.warning(`Softphone state: ${state}. Attempting call anyway…`);
                     }
                     dial.mutate();
                   }}
