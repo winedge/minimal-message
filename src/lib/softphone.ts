@@ -77,8 +77,9 @@ export class Softphone {
     this.ua.on("disconnected", (e: any) => {
       this.clearRegistrationTimer();
       const reason = e?.reason || e?.cause || "WebSocket connection failed";
+      const origin = typeof window !== "undefined" ? window.location.origin : "this app origin";
       this.events.onError?.(
-        `PBX WebSocket failed: ${reason}. Check Asterisk allowed_origins includes this app URL.`,
+        `PBX WebSocket failed from ${origin} to ${opts.wssUrl}: ${reason}. If Asterisk already allows this origin, use the published app directly or proxy PBX WSS through standard HTTPS port 443.`,
       );
       this.setState("failed");
     });
@@ -90,8 +91,9 @@ export class Softphone {
     });
     this.setState("registering");
     this.registrationTimer = window.setTimeout(() => {
+      const origin = typeof window !== "undefined" ? window.location.origin : "this app origin";
       this.events.onError?.(
-        "Registration timed out. Check Asterisk http.conf allowed_origins for this app URL and reload Asterisk HTTP/PJSIP.",
+        `Registration timed out from ${origin} to ${opts.wssUrl}. Check Asterisk allowed_origins, then use the published app directly or expose WSS on port 443 if the embedded preview blocks port 8089.`,
       );
       this.setState("failed");
       try { this.ua?.stop(); } catch {}
@@ -286,4 +288,60 @@ export class Softphone {
       this.audio = null;
     }
   }
+}
+
+export function testSoftphoneWebSocket(wssUrl: string): Promise<{
+  ok: boolean;
+  origin: string;
+  url: string;
+  code?: number;
+  reason?: string;
+  message: string;
+}> {
+  return new Promise((resolve) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
+    if (!wssUrl) {
+      resolve({ ok: false, origin, url: wssUrl, message: "Missing PBX WSS URL" });
+      return;
+    }
+
+    let settled = false;
+    let ws: WebSocket | null = null;
+    const finish = (result: { ok: boolean; code?: number; reason?: string; message: string }) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve({ ...result, origin, url: wssUrl });
+    };
+    const timer = window.setTimeout(() => {
+      try { ws?.close(); } catch {}
+      finish({ ok: false, message: "WebSocket probe timed out" });
+    }, 5000);
+
+    try {
+      ws = new WebSocket(wssUrl, "sip");
+      ws.onopen = () => {
+        try { ws?.close(1000, "probe-complete"); } catch {}
+        finish({ ok: true, message: "PBX WebSocket opened successfully" });
+      };
+      ws.onerror = () => {
+        finish({ ok: false, message: "Browser rejected the PBX WebSocket before SIP registration" });
+      };
+      ws.onclose = (event) => {
+        if (!settled) {
+          finish({
+            ok: false,
+            code: event.code,
+            reason: event.reason,
+            message: "PBX WebSocket closed before opening",
+          });
+        }
+      };
+    } catch (error) {
+      finish({
+        ok: false,
+        message: error instanceof Error ? error.message : "Failed to create WebSocket",
+      });
+    }
+  });
 }
