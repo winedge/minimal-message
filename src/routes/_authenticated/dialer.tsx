@@ -60,14 +60,14 @@ function DialerPage() {
       since.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("calls")
-        .select("id, duration_sec, status")
+        .select("id, duration, status")
         .eq("agent_id", u.id)
-        .gte("created_at", since.toISOString());
+        .gte("started_at", since.toISOString());
       if (error) return { count: 0, talkSec: 0, answered: 0 };
       const rows = data ?? [];
       return {
         count: rows.length,
-        talkSec: rows.reduce((a: number, r: any) => a + (r.duration_sec ?? 0), 0),
+        talkSec: rows.reduce((a: number, r: any) => a + (r.duration ?? 0), 0),
         answered: rows.filter((r: any) => r.status === "answered" || r.status === "ended").length,
       };
     },
@@ -455,8 +455,15 @@ function DialerPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => dial.mutate()}
-                  disabled={!phone || state !== "registered" || dial.isPending}
+                  onClick={() => {
+                    if (!phone) return;
+                    if (state !== "registered") {
+                      toast.error(`Softphone not ready (state: ${state}). Check WebSocket registration.`);
+                      return;
+                    }
+                    dial.mutate();
+                  }}
+                  disabled={!phone || dial.isPending}
                   className="flex h-14 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition active:scale-95 disabled:opacity-40"
                 >
                   <Phone className="h-6 w-6" />
