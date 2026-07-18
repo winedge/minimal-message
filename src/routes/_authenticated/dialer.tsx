@@ -52,6 +52,14 @@ function DialerPage() {
   });
 
   const [phone, setPhone] = useState("");
+  const [outboundDidId, setOutboundDidId] = useState<string>("");
+  const outboundDids = useQuery({
+    queryKey: ["outbound_dids"],
+    queryFn: async () => {
+      const { data } = await supabase.from("outbound_dids").select("id, phone_number, label, is_default").order("phone_number");
+      return data ?? [];
+    },
+  });
   const [state, setState] = useState<SoftphoneState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
