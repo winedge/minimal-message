@@ -17,7 +17,9 @@ import { Route as AuthenticatedDialerRouteImport } from './routes/_authenticated
 import { Route as ApiPublicInboundRouteRouteImport } from './routes/api/public/inbound-route'
 import { Route as ApiPublicAsteriskEventsRouteImport } from './routes/api/public/asterisk-events'
 import { Route as AuthenticatedAdminLiveRouteImport } from './routes/_authenticated/admin/live'
+import { Route as AuthenticatedAdminInboundRouteImport } from './routes/_authenticated/admin/inbound'
 import { Route as AuthenticatedAdminFieldsRouteImport } from './routes/_authenticated/admin/fields'
+import { Route as AuthenticatedAdminContactsRouteImport } from './routes/_authenticated/admin/contacts'
 import { Route as AuthenticatedAdminCallsRouteImport } from './routes/_authenticated/admin/calls'
 import { Route as AuthenticatedAdminAgentsRouteImport } from './routes/_authenticated/admin/agents'
 
@@ -60,10 +62,22 @@ const AuthenticatedAdminLiveRoute = AuthenticatedAdminLiveRouteImport.update({
   path: '/admin/live',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminInboundRoute =
+  AuthenticatedAdminInboundRouteImport.update({
+    id: '/admin/inbound',
+    path: '/admin/inbound',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminFieldsRoute =
   AuthenticatedAdminFieldsRouteImport.update({
     id: '/admin/fields',
     path: '/admin/fields',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminContactsRoute =
+  AuthenticatedAdminContactsRouteImport.update({
+    id: '/admin/contacts',
+    path: '/admin/contacts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminCallsRoute = AuthenticatedAdminCallsRouteImport.update({
@@ -85,7 +99,9 @@ export interface FileRoutesByFullPath {
   '/history': typeof AuthenticatedHistoryRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/admin/contacts': typeof AuthenticatedAdminContactsRoute
   '/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/admin/live': typeof AuthenticatedAdminLiveRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
@@ -97,7 +113,9 @@ export interface FileRoutesByTo {
   '/history': typeof AuthenticatedHistoryRoute
   '/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/admin/contacts': typeof AuthenticatedAdminContactsRoute
   '/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/admin/live': typeof AuthenticatedAdminLiveRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
@@ -111,7 +129,9 @@ export interface FileRoutesById {
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/admin/agents': typeof AuthenticatedAdminAgentsRoute
   '/_authenticated/admin/calls': typeof AuthenticatedAdminCallsRoute
+  '/_authenticated/admin/contacts': typeof AuthenticatedAdminContactsRoute
   '/_authenticated/admin/fields': typeof AuthenticatedAdminFieldsRoute
+  '/_authenticated/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/_authenticated/admin/live': typeof AuthenticatedAdminLiveRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
@@ -125,7 +145,9 @@ export interface FileRouteTypes {
     | '/history'
     | '/admin/agents'
     | '/admin/calls'
+    | '/admin/contacts'
     | '/admin/fields'
+    | '/admin/inbound'
     | '/admin/live'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
@@ -137,7 +159,9 @@ export interface FileRouteTypes {
     | '/history'
     | '/admin/agents'
     | '/admin/calls'
+    | '/admin/contacts'
     | '/admin/fields'
+    | '/admin/inbound'
     | '/admin/live'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
@@ -150,7 +174,9 @@ export interface FileRouteTypes {
     | '/_authenticated/history'
     | '/_authenticated/admin/agents'
     | '/_authenticated/admin/calls'
+    | '/_authenticated/admin/contacts'
     | '/_authenticated/admin/fields'
+    | '/_authenticated/admin/inbound'
     | '/_authenticated/admin/live'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
@@ -222,11 +248,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLiveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/inbound': {
+      id: '/_authenticated/admin/inbound'
+      path: '/admin/inbound'
+      fullPath: '/admin/inbound'
+      preLoaderRoute: typeof AuthenticatedAdminInboundRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/fields': {
       id: '/_authenticated/admin/fields'
       path: '/admin/fields'
       fullPath: '/admin/fields'
       preLoaderRoute: typeof AuthenticatedAdminFieldsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/contacts': {
+      id: '/_authenticated/admin/contacts'
+      path: '/admin/contacts'
+      fullPath: '/admin/contacts'
+      preLoaderRoute: typeof AuthenticatedAdminContactsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/calls': {
@@ -251,7 +291,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedAdminAgentsRoute: typeof AuthenticatedAdminAgentsRoute
   AuthenticatedAdminCallsRoute: typeof AuthenticatedAdminCallsRoute
+  AuthenticatedAdminContactsRoute: typeof AuthenticatedAdminContactsRoute
   AuthenticatedAdminFieldsRoute: typeof AuthenticatedAdminFieldsRoute
+  AuthenticatedAdminInboundRoute: typeof AuthenticatedAdminInboundRoute
   AuthenticatedAdminLiveRoute: typeof AuthenticatedAdminLiveRoute
 }
 
@@ -260,7 +302,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedAdminAgentsRoute: AuthenticatedAdminAgentsRoute,
   AuthenticatedAdminCallsRoute: AuthenticatedAdminCallsRoute,
+  AuthenticatedAdminContactsRoute: AuthenticatedAdminContactsRoute,
   AuthenticatedAdminFieldsRoute: AuthenticatedAdminFieldsRoute,
+  AuthenticatedAdminInboundRoute: AuthenticatedAdminInboundRoute,
   AuthenticatedAdminLiveRoute: AuthenticatedAdminLiveRoute,
 }
 
