@@ -100,6 +100,7 @@ function DialerPage() {
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(0);
   const [wsProbe, setWsProbe] = useState<string | null>(null);
+  const [dialMessage, setDialMessage] = useState<string | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
 
@@ -225,15 +226,22 @@ function DialerPage() {
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onMutate: () => {
+      setDialMessage("Sending call to Asterisk…");
       toast.info("Starting call…");
     },
     onSuccess: (r) => {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
       setValues({});
+      setDialMessage("Asterisk accepted the call. Your softphone should ring now.");
       toast.success("Dialing…");
     },
-    onError: (e: any) => toast.error(e.message ?? "Failed"),
+    onError: (e: any) => {
+      const msg = e.message ?? "Call failed";
+      setDialMessage(msg);
+      toast.error(msg);
+      console.error("[dial] originate failed", e);
+    },
   });
 
   async function endCall() {
@@ -482,6 +490,11 @@ function DialerPage() {
                     className="mt-3 w-full bg-transparent text-center text-3xl font-light tracking-wider text-white placeholder:text-neutral-600 focus:outline-none"
                   />
                   <div className="mt-1 h-4" />
+                  {dialMessage && (
+                    <div className="mx-auto mt-2 max-w-[280px] break-words rounded-lg bg-neutral-800 px-3 py-2 text-center text-[11px] leading-snug text-neutral-300">
+                      {dialMessage}
+                    </div>
+                  )}
                   {(outboundDids.data?.length ?? 0) > 0 && (
                     <div className="mt-2 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-neutral-400">
                       <span>Caller ID</span>

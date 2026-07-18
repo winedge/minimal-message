@@ -74,7 +74,8 @@ Reload: `asterisk -rx "pjsip reload"` — verify with
 ## 3. `extensions.conf` — outbound context
 
 The app originates through ARI into `context=from-internal` with:
-- `${EXTEN}` = the customer number (E.164)
+- `endpoint` = the agent SIP endpoint name, e.g. `PJSIP/agent_1001`
+- `${EXTEN}` = the customer number normalized to digits, e.g. `12345678900`
 - Channel variable `CALLERID_NUM` = the DID selected by the agent in the UI
   (falls back to the admin-marked default DID; if none, the agent's extension)
 
