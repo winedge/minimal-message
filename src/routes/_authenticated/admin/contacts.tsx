@@ -241,7 +241,7 @@ function ContactsAdminPage() {
                     ))}
                   </div>
                   <div className="rounded border">
-                    <table className="w-full text-xs">
+                    <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-xs">
                       <thead className="bg-muted text-left">
                         <tr>
                           {FIELDS.map((f) => (
@@ -260,7 +260,7 @@ function ContactsAdminPage() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{csvRows.length} rows in file</span>
@@ -277,7 +277,7 @@ function ContactsAdminPage() {
             </div>
 
             <div className="rounded border">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
                 <thead className="bg-muted text-left">
                   <tr>
                     <th className="px-3 py-2">Phone</th>
@@ -317,7 +317,7 @@ function ContactsAdminPage() {
                     </tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </>
         )}

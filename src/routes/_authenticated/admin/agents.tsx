@@ -97,7 +97,7 @@ function AgentsPage() {
       </section>
 
       <section className="rounded border">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted text-left">
             <tr>
               <th className="p-2">Name</th>
@@ -131,7 +131,7 @@ function AgentsPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </section>
     </div>
   );

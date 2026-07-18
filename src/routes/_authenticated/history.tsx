@@ -25,7 +25,7 @@ function HistoryPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Your calls</h1>
       <div className="overflow-x-auto rounded border">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted text-left">
             <tr>
               <th className="p-2">Started</th>
@@ -61,7 +61,7 @@ function HistoryPage() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

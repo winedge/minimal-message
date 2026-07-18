@@ -289,31 +289,31 @@ function DialerPage() {
   const stats = todayStats.data ?? { count: 0, talkSec: 0, answered: 0 };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Top status bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
-        <div className="flex items-center gap-3">
-          <span className={`relative flex h-3 w-3`}>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-card p-3 sm:flex sm:flex-wrap sm:justify-between sm:p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="relative flex h-3 w-3 shrink-0">
             <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${statusColor}`} />
             <span className={`relative inline-flex h-3 w-3 rounded-full ${statusColor}`} />
           </span>
-          <div>
-            <div className="text-sm font-semibold leading-tight">{statusLabel[state]}</div>
-            <div className="text-xs text-muted-foreground">
-              {creds.data?.provisioned ? `Extension ${creds.data.extension}` : "Not provisioned"}
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold leading-tight">{statusLabel[state]}</div>
+            <div className="truncate text-xs text-muted-foreground">
+              {creds.data?.provisioned ? `Ext ${creds.data.extension}` : "Not provisioned"}
               {inCall && phone ? ` · ${phone}` : ""}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <StatChip icon={<PhoneCall className="h-3.5 w-3.5" />} label="Calls today" value={String(stats.count)} />
+        <div className="col-span-2 grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-3">
+          <StatChip icon={<PhoneCall className="h-3.5 w-3.5" />} label="Calls" value={String(stats.count)} />
           <StatChip icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Answered" value={String(stats.answered)} />
-          <StatChip icon={<Clock className="h-3.5 w-3.5" />} label="Talk time" value={fmtDuration(stats.talkSec)} />
+          <StatChip icon={<Clock className="h-3.5 w-3.5" />} label="Talk" value={fmtDuration(stats.talkSec)} />
         </div>
       </div>
 
-    <div className="grid gap-6 lg:grid-cols-[280px_360px_1fr]">
-      <section className="mx-auto w-full max-w-[340px] space-y-4 lg:order-2">
+    <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_360px_1fr]">
+      <section className="mx-auto w-full max-w-[360px] space-y-4 lg:order-2">
 
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
@@ -632,7 +632,7 @@ function ContactsPanel({
           className="pl-8"
         />
       </div>
-      <ul className="max-h-[520px] divide-y overflow-y-auto rounded-lg border">
+      <ul className="max-h-[320px] divide-y overflow-y-auto rounded-lg border lg:max-h-[520px]">
         {rows.map((c) => {
           const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown";
           const initials = name === "Unknown" ? "?" : name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();

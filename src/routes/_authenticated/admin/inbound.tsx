@@ -110,7 +110,7 @@ function InboundPage() {
       </div>
 
       <div className="rounded border">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted text-left">
             <tr>
               <th className="px-3 py-2">DID</th>
@@ -167,7 +167,7 @@ function InboundPage() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {editing && (
