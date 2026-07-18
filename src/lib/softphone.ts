@@ -17,7 +17,8 @@ export interface IncomingCallInfo {
 export interface SoftphoneEvents {
   onState?: (s: SoftphoneState) => void;
   onError?: (msg: string) => void;
-  onIncoming?: (info: IncomingCallInfo) => void;
+  onIncoming?: (info: IncomingCallInfo) => "auto-answer" | void;
+  onEnded?: () => void;
   onMuteChange?: (muted: boolean) => void;
   onHoldChange?: (held: boolean) => void;
 }
@@ -116,9 +117,13 @@ export class Softphone {
     const from = session.remote_identity?.uri?.user ?? "unknown";
     const displayName = session.remote_identity?.display_name;
     this.wireSession(session);
+    const action = this.events.onIncoming?.({ from, displayName });
+    if (action === "auto-answer") {
+      this.answer();
+      return;
+    }
     this.startRinger();
     this.setState("incoming");
-    this.events.onIncoming?.({ from, displayName });
     session.on("failed", () => this.stopRinger());
     session.on("ended", () => this.stopRinger());
     session.on("accepted", () => this.stopRinger());
@@ -163,11 +168,13 @@ export class Softphone {
     session.on("confirmed", () => this.setState("in_call"));
     session.on("ended", () => {
       this.session = null;
+      this.events.onEnded?.();
       this.setState("registered");
     });
     session.on("failed", (e: any) => {
       this.events.onError?.(`Call failed: ${e.cause}`);
       this.session = null;
+      this.events.onEnded?.();
       this.setState("registered");
     });
     const attach = (stream: MediaStream) => {
