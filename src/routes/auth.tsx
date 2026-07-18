@@ -13,26 +13,41 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) setError(error.message);
-    else navigate({ to: "/dialer", replace: true });
+    setInfo(null);
+    if (mode === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (error) setError(error.message);
+      else navigate({ to: "/dialer", replace: true });
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      setBusy(false);
+      if (error) return setError(error.message);
+      if (data.session) navigate({ to: "/dialer", replace: true });
+      else setInfo("Account created. Check your email to confirm, or sign in if confirmation is disabled.");
+    }
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border p-6">
         <div>
-          <h1 className="text-xl font-semibold">Sign in</h1>
+          <h1 className="text-xl font-semibold">{mode === "signin" ? "Sign in" : "Sign up"}</h1>
           <p className="text-sm text-muted-foreground">Agent & admin console.</p>
         </div>
         <div className="space-y-2">
@@ -41,14 +56,22 @@ function AuthPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {info && <p className="text-sm text-muted-foreground">{info}</p>}
         <Button type="submit" className="w-full" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
         </Button>
+        <button
+          type="button"
+          onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setInfo(null); }}
+          className="w-full text-xs text-muted-foreground underline"
+        >
+          {mode === "signin" ? "No account? Sign up (bootstrap first admin)" : "Have an account? Sign in"}
+        </button>
         <p className="text-xs text-muted-foreground">
-          Accounts are created by an admin. Return <Link to="/" className="underline">home</Link>.
+          Return <Link to="/" className="underline">home</Link>.
         </p>
       </form>
     </div>
