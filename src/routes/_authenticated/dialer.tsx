@@ -462,7 +462,7 @@ function DialerPage() {
                       return;
                     }
                     if (dial.isPending) return;
-                    if (state !== "registered" && state !== "in_call") {
+                    if (state !== "registered") {
                       toast.warning(`Softphone state: ${state}. Attempting call anyway…`);
                     }
                     dial.mutate();
