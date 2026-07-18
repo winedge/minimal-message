@@ -11,9 +11,9 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     const token = authHeader.replace(/^Bearer\s+/i, "");
     if (!token) throw new Response("Unauthorized", { status: 401 });
 
-    const url = process.env.SUPABASE_URL;
-    const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
-    if (!url || !anon) throw new Response("Server misconfigured", { status: 500 });
+    const url = "https://supabase.accentrixmailer.online";
+    const anon = process.env.SELFHOST_SUPABASE_ANON_KEY;
+    if (!anon) throw new Response("Server misconfigured", { status: 500 });
 
     const supabase = createClient(url, anon, {
       global: { headers: { Authorization: `Bearer ${token}` } },
