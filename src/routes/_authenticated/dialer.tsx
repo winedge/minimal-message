@@ -214,6 +214,9 @@ function DialerPage() {
 
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
+    onMutate: () => {
+      toast.info("Starting call…");
+    },
     onSuccess: (r) => {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
@@ -255,23 +258,11 @@ function DialerPage() {
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
   };
 
-  if (creds.isLoading) return <p className="text-muted-foreground">Loading softphone…</p>;
-  if (creds.data && creds.data.provisioned === false) {
-    return (
-      <div className="rounded border p-6">
-        <h2 className="text-lg font-semibold">SIP not provisioned</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Ask an admin to create a SIP endpoint for your account.
-        </p>
-      </div>
-    );
-  }
-
   const inCall = state === "in_call" || !!activeChannel;
-  const handleKey = (k: string) => {
+  const handleKey = useCallback((k: string) => {
     if (inCall) softphoneRef.current?.sendDtmf(k);
     else if (!activeChannel) setPhone((p) => p + k);
-  };
+  }, [activeChannel, inCall]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -288,9 +279,9 @@ function DialerPage() {
         if (!inCall && !activeChannel) setPhone((p) => p + "+");
       } else if (k === "Backspace") {
         e.preventDefault();
-        if (!inCall && !activeChannel) setPhone((p) => p.slice(0, -1));
+        if (!inCall && !activeChannel) setPhone((p) => (p.length > DEFAULT_PHONE.length ? p.slice(0, -1) : DEFAULT_PHONE));
       } else if (k === "Enter") {
-        if (!inCall && !activeChannel && phone && state === "registered" && !dial.isPending) {
+        if (!inCall && !activeChannel && phone && !dial.isPending) {
           e.preventDefault();
           dial.mutate();
         }
@@ -298,7 +289,20 @@ function DialerPage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inCall, activeChannel, phone, state, dial]);
+  }, [activeChannel, dial, handleKey, inCall, phone]);
+
+  if (creds.isLoading) return <p className="text-muted-foreground">Loading softphone…</p>;
+  if (creds.data && creds.data.provisioned === false) {
+    return (
+      <div className="rounded border p-6">
+        <h2 className="text-lg font-semibold">SIP not provisioned</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ask an admin to create a SIP endpoint for your account.
+        </p>
+      </div>
+    );
+  }
+
   const statusLabel: Record<SoftphoneState, string> = {
     idle: "Offline",
     registering: "Connecting…",
