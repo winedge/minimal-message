@@ -31,6 +31,7 @@ export class Softphone {
   private events: SoftphoneEvents;
   private outputDeviceId: string | null = null;
   private inputDeviceId: string | null = null;
+  private registrationTimer: number | null = null;
 
   constructor(events: SoftphoneEvents = {}) {
     this.events = events;
@@ -38,6 +39,13 @@ export class Softphone {
 
   private setState(s: SoftphoneState) {
     this.events.onState?.(s);
+  }
+
+  private clearRegistrationTimer() {
+    if (this.registrationTimer) {
+      clearTimeout(this.registrationTimer);
+      this.registrationTimer = null;
+    }
   }
 
   register(opts: { username: string; password: string; wssUrl: string; sipDomain: string }) {
@@ -53,10 +61,25 @@ export class Softphone {
       register: true,
       session_timers: false,
     });
-    this.ua.on("registered", () => this.setState("registered"));
-    this.ua.on("unregistered", () => this.setState("idle"));
+    this.ua.on("registered", () => {
+      this.clearRegistrationTimer();
+      this.setState("registered");
+    });
+    this.ua.on("unregistered", () => {
+      this.clearRegistrationTimer();
+      this.setState("idle");
+    });
     this.ua.on("registrationFailed", (e: any) => {
+      this.clearRegistrationTimer();
       this.events.onError?.(`Registration failed: ${e.cause}`);
+      this.setState("failed");
+    });
+    this.ua.on("disconnected", (e: any) => {
+      this.clearRegistrationTimer();
+      const reason = e?.reason || e?.cause || "WebSocket connection failed";
+      this.events.onError?.(
+        `PBX WebSocket failed: ${reason}. Check Asterisk allowed_origins includes this app URL.`,
+      );
       this.setState("failed");
     });
     this.ua.on("newRTCSession", (data: any) => {
@@ -66,6 +89,13 @@ export class Softphone {
       }
     });
     this.setState("registering");
+    this.registrationTimer = window.setTimeout(() => {
+      this.events.onError?.(
+        "Registration timed out. Check Asterisk http.conf allowed_origins for this app URL and reload Asterisk HTTP/PJSIP.",
+      );
+      this.setState("failed");
+      try { this.ua?.stop(); } catch {}
+    }, 12000);
     this.ua.start();
 
     if (typeof document !== "undefined" && !this.audio) {
@@ -247,6 +277,7 @@ export class Softphone {
   }
 
   stop() {
+    this.clearRegistrationTimer();
     this.hangup();
     try { this.ua?.stop(); } catch {}
     this.ua = null;
