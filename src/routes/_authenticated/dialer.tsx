@@ -187,12 +187,110 @@ function DialerPage() {
           >
             {dial.isPending ? "Dialing…" : "Dial"}
           </Button>
-          <Button variant="destructive" disabled={!activeChannel} onClick={endCall}>
-            Hang up
+          <Button variant="destructive" disabled={!activeChannel && state !== "in_call"} onClick={endCall}>
+            <PhoneOff className="mr-1 h-4 w-4" /> Hang up
           </Button>
         </div>
+
+        {incoming && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+            <p className="text-sm font-medium">
+              Incoming: {incoming.displayName ?? incoming.from}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" className="flex-1" onClick={acceptIncoming}>
+                <Phone className="mr-1 h-4 w-4" /> Answer
+              </Button>
+              <Button size="sm" variant="destructive" className="flex-1" onClick={rejectIncoming}>
+                Reject
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* In-call controls */}
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            variant={muted ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => softphoneRef.current?.toggleMute()}
+          >
+            {muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}
+            {muted ? "Unmute" : "Mute"}
+          </Button>
+          <Button
+            variant={held ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => softphoneRef.current?.toggleHold()}
+          >
+            {held ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
+            {held ? "Resume" : "Hold"}
+          </Button>
+          <Button
+            variant={showKeypad ? "default" : "outline"}
+            size="sm"
+            disabled={state !== "in_call"}
+            onClick={() => setShowKeypad((v) => !v)}
+          >
+            Keypad
+          </Button>
+        </div>
+
+        {showKeypad && (
+          <div className="grid grid-cols-3 gap-2">
+            {["1","2","3","4","5","6","7","8","9","*","0","#"].map((k) => (
+              <Button
+                key={k}
+                variant="outline"
+                onClick={() => softphoneRef.current?.sendDtmf(k)}
+              >
+                {k}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Device selection */}
+        <div className="space-y-2 border-t pt-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Microphone</Label>
+            <select
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={inputId}
+              onChange={(e) => {
+                setInputId(e.target.value);
+                softphoneRef.current?.setInputDevice(e.target.value);
+              }}
+            >
+              <option value="">Default</option>
+              {inputs.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Speaker</Label>
+            <select
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={outputId}
+              onChange={(e) => {
+                setOutputId(e.target.value);
+                softphoneRef.current?.setOutputDevice(e.target.value);
+              }}
+            >
+              <option value="">Default</option>
+              {outputs.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 8)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {error && <p className="text-xs text-destructive">{error}</p>}
       </section>
+
 
       <section className="space-y-4 rounded-lg border p-4">
         <h2 className="font-semibold">Call notes</h2>
