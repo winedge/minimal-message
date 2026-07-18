@@ -146,7 +146,15 @@ function DialerPage() {
       setHeld(false);
       setIncoming(null);
       setShowKeypad(false);
+      setCallStartedAt(null);
     }
+    if (state === "in_call" && !callStartedAt) setCallStartedAt(Date.now());
+  }, [state, callStartedAt]);
+
+  useEffect(() => {
+    if (state !== "in_call") return;
+    const t = window.setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
   }, [state]);
 
   const pushPresence = useCallback(async (forceOffline = false) => {
