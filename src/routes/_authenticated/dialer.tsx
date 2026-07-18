@@ -97,6 +97,8 @@ function DialerPage() {
   const [inputId, setInputId] = useState<string>("");
   const [outputId, setOutputId] = useState<string>("");
   const [showKeypad, setShowKeypad] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(0);
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
