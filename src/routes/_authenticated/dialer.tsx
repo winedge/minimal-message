@@ -102,6 +102,7 @@ function DialerPage() {
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const [dialMessage, setDialMessage] = useState<string | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
+  const pendingOutboundRef = useRef(false);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
 
   useEffect(() => {
@@ -118,6 +119,14 @@ function DialerPage() {
         toast.error(m);
       },
       onIncoming: (info) => {
+        // If we just initiated an outbound originate, Asterisk calls the agent
+        // endpoint first (appears as incoming). Auto-answer and don't show the
+        // incoming UI.
+        if (pendingOutboundRef.current) {
+          pendingOutboundRef.current = false;
+          setTimeout(() => softphoneRef.current?.answer(), 0);
+          return;
+        }
         setIncoming(info);
         toast.info(`Incoming call from ${info.displayName ?? info.from}`);
       },
@@ -226,6 +235,7 @@ function DialerPage() {
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onMutate: () => {
+      pendingOutboundRef.current = true;
       setDialMessage("Sending call to Asterisk…");
       toast.info("Starting call…");
     },
@@ -237,6 +247,7 @@ function DialerPage() {
       toast.success("Dialing…");
     },
     onError: (e: any) => {
+      pendingOutboundRef.current = false;
       const msg = e.message ?? "Call failed";
       setDialMessage(msg);
       toast.error(msg);
