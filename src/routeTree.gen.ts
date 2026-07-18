@@ -16,6 +16,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedDialerRouteImport } from './routes/_authenticated/dialer'
 import { Route as ApiPublicInboundRouteRouteImport } from './routes/api/public/inbound-route'
 import { Route as ApiPublicAsteriskEventsRouteImport } from './routes/api/public/asterisk-events'
+import { Route as AuthenticatedAdminOutboundRouteImport } from './routes/_authenticated/admin/outbound'
 import { Route as AuthenticatedAdminLiveRouteImport } from './routes/_authenticated/admin/live'
 import { Route as AuthenticatedAdminInboundRouteImport } from './routes/_authenticated/admin/inbound'
 import { Route as AuthenticatedAdminFieldsRouteImport } from './routes/_authenticated/admin/fields'
@@ -57,6 +58,12 @@ const ApiPublicAsteriskEventsRoute = ApiPublicAsteriskEventsRouteImport.update({
   path: '/api/public/asterisk-events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminOutboundRoute =
+  AuthenticatedAdminOutboundRouteImport.update({
+    id: '/admin/outbound',
+    path: '/admin/outbound',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminLiveRoute = AuthenticatedAdminLiveRouteImport.update({
   id: '/admin/live',
   path: '/admin/live',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/admin/fields': typeof AuthenticatedAdminFieldsRoute
   '/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
 }
@@ -117,6 +125,7 @@ export interface FileRoutesByTo {
   '/admin/fields': typeof AuthenticatedAdminFieldsRoute
   '/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
 }
@@ -133,6 +142,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/fields': typeof AuthenticatedAdminFieldsRoute
   '/_authenticated/admin/inbound': typeof AuthenticatedAdminInboundRoute
   '/_authenticated/admin/live': typeof AuthenticatedAdminLiveRoute
+  '/_authenticated/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
 }
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/admin/fields'
     | '/admin/inbound'
     | '/admin/live'
+    | '/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
   fileRoutesByTo: FileRoutesByTo
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/admin/fields'
     | '/admin/inbound'
     | '/admin/live'
+    | '/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
   id:
@@ -178,6 +190,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/fields'
     | '/_authenticated/admin/inbound'
     | '/_authenticated/admin/live'
+    | '/_authenticated/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
   fileRoutesById: FileRoutesById
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAsteriskEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/outbound': {
+      id: '/_authenticated/admin/outbound'
+      path: '/admin/outbound'
+      fullPath: '/admin/outbound'
+      preLoaderRoute: typeof AuthenticatedAdminOutboundRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/live': {
       id: '/_authenticated/admin/live'
       path: '/admin/live'
@@ -295,6 +315,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminFieldsRoute: typeof AuthenticatedAdminFieldsRoute
   AuthenticatedAdminInboundRoute: typeof AuthenticatedAdminInboundRoute
   AuthenticatedAdminLiveRoute: typeof AuthenticatedAdminLiveRoute
+  AuthenticatedAdminOutboundRoute: typeof AuthenticatedAdminOutboundRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -306,6 +327,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminFieldsRoute: AuthenticatedAdminFieldsRoute,
   AuthenticatedAdminInboundRoute: AuthenticatedAdminInboundRoute,
   AuthenticatedAdminLiveRoute: AuthenticatedAdminLiveRoute,
+  AuthenticatedAdminOutboundRoute: AuthenticatedAdminOutboundRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
