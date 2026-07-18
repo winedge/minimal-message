@@ -189,7 +189,7 @@ function DialerPage() {
 
 
   const dial = useMutation({
-    mutationFn: async () => originate({ data: { customerPhone: phone } }),
+    mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onSuccess: (r) => {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
