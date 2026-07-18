@@ -52,6 +52,14 @@ function DialerPage() {
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>({});
+  const [muted, setMuted] = useState(false);
+  const [held, setHeld] = useState(false);
+  const [incoming, setIncoming] = useState<IncomingCallInfo | null>(null);
+  const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
+  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [inputId, setInputId] = useState<string>("");
+  const [outputId, setOutputId] = useState<string>("");
+  const [showKeypad, setShowKeypad] = useState(false);
   const softphoneRef = useRef<Softphone | null>(null);
 
   useEffect(() => {
@@ -63,6 +71,12 @@ function DialerPage() {
         setError(m);
         toast.error(m);
       },
+      onIncoming: (info) => {
+        setIncoming(info);
+        toast.info(`Incoming call from ${info.displayName ?? info.from}`);
+      },
+      onMuteChange: setMuted,
+      onHoldChange: setHeld,
     });
     softphoneRef.current = sp;
     sp.register({
@@ -71,11 +85,34 @@ function DialerPage() {
       wssUrl: c.wssUrl,
       sipDomain: c.sipDomain,
     });
+    sp.listDevices().then(({ inputs, outputs }) => {
+      setInputs(inputs);
+      setOutputs(outputs);
+    });
     return () => {
       sp.stop();
       softphoneRef.current = null;
     };
   }, [creds.data]);
+
+  useEffect(() => {
+    if (state === "registered") {
+      setMuted(false);
+      setHeld(false);
+      setIncoming(null);
+      setShowKeypad(false);
+    }
+  }, [state]);
+
+  const acceptIncoming = useCallback(() => {
+    softphoneRef.current?.answer();
+    setIncoming(null);
+  }, []);
+  const rejectIncoming = useCallback(() => {
+    softphoneRef.current?.reject();
+    setIncoming(null);
+  }, []);
+
 
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone } }),
