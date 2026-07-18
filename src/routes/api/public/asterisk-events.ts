@@ -12,7 +12,10 @@ export const Route = createFileRoute("/api/public/asterisk-events")({
         if (!secret) return new Response("Server misconfigured", { status: 500 });
 
         const body = await request.text();
-        const sig = request.headers.get("x-signature") ?? "";
+        const sig =
+          request.headers.get("x-signature") ??
+          request.headers.get("x-asterisk-signature") ??
+          "";
         const expected = createHmac("sha256", secret).update(body).digest("hex");
         const a = Buffer.from(sig);
         const b = Buffer.from(expected);
