@@ -123,7 +123,7 @@ function OutboundPage() {
       </div>
 
       <div className="rounded border">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/50 text-left">
             <tr>
               <th className="p-2">Number</th>
@@ -161,7 +161,7 @@ function OutboundPage() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );
