@@ -32,6 +32,7 @@ function InboundPage() {
   const qc = useQueryClient();
   const upsert = useServerFn(upsertInboundRoute);
   const remove = useServerFn(deleteInboundRoute);
+  const fetchTelnyx = useServerFn(listTelnyxNumbers);
 
   const [editing, setEditing] = useState<Partial<Route> | null>(null);
 
