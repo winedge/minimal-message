@@ -244,6 +244,7 @@ function DialerPage() {
     }
     setActiveChannel(null);
     setActiveCallId(null);
+    setPhone(DEFAULT_PHONE);
     qc.invalidateQueries({ queryKey: ["history"] });
     qc.invalidateQueries({ queryKey: ["dialer-today"] });
   }
