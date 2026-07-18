@@ -5,17 +5,26 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
-const require = createRequire(import.meta.url);
-const eventsPolyfillPath = require.resolve("events/events.js");
+const eventsPolyfillPath = fileURLToPath(new URL("./src/lib/browser-events.ts", import.meta.url));
 
 export default defineConfig({
   vite: {
+    plugins: [
+      {
+        name: "browser-events-polyfill",
+        enforce: "pre",
+        resolveId(source) {
+          if (source === "events" || source === "node:events") return eventsPolyfillPath;
+          return null;
+        },
+      },
+    ],
     resolve: {
       alias: [
         // JsSIP depends on Node's `events` name, which must resolve to the
-        // browser EventEmitter package in the client bundle.
+        // browser EventEmitter implementation in the client bundle.
         { find: /^events$/, replacement: eventsPolyfillPath },
         { find: /^node:events$/, replacement: eventsPolyfillPath },
       ],
