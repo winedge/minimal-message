@@ -33,7 +33,12 @@ export const getSipCredentials = createServerFn({ method: "GET" })
 export const originateCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({ customerPhone: z.string().trim().min(3).max(32) }).parse(input),
+    z
+      .object({
+        customerPhone: z.string().trim().min(3).max(32),
+        outboundDidId: z.string().uuid().optional().nullable(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const ariUrl = process.env.ASTERISK_ARI_URL;
@@ -48,6 +53,13 @@ export const originateCall = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (!sip) throw new Error("SIP endpoint not provisioned for this agent");
+
+    // Resolve outbound Caller ID (DID). Preference: explicit id → default → agent extension.
+    let callerNumber = sip.extension;
+    const didQuery = data.outboundDidId
+      ? await supabaseAdmin.from("outbound_dids").select("phone_number").eq("id", data.outboundDidId).maybeSingle()
+      : await supabaseAdmin.from("outbound_dids").select("phone_number").eq("is_default", true).maybeSingle();
+    if (didQuery.data?.phone_number) callerNumber = didQuery.data.phone_number;
 
     // Insert call row (ringing)
     const { data: call, error: insErr } = await context.supabase
@@ -68,10 +80,11 @@ export const originateCall = createServerFn({ method: "POST" })
       extension: data.customerPhone,
       context: "from-internal",
       priority: 1,
-      callerId: `"Agent" <${sip.extension}>`,
+      callerId: `"Agent" <${callerNumber}>`,
       variables: {
         LOVABLE_CALL_ID: call.id,
         LOVABLE_AGENT_ID: context.userId,
+        CALLERID_NUM: callerNumber,
       },
     };
     const res = await fetch(`${ariUrl.replace(/\/$/, "")}/channels`, {

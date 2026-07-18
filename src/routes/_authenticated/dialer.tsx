@@ -52,6 +52,14 @@ function DialerPage() {
   });
 
   const [phone, setPhone] = useState("");
+  const [outboundDidId, setOutboundDidId] = useState<string>("");
+  const outboundDids = useQuery({
+    queryKey: ["outbound_dids"],
+    queryFn: async () => {
+      const { data } = await supabase.from("outbound_dids").select("id, phone_number, label, is_default").order("phone_number");
+      return data ?? [];
+    },
+  });
   const [state, setState] = useState<SoftphoneState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
@@ -181,7 +189,7 @@ function DialerPage() {
 
 
   const dial = useMutation({
-    mutationFn: async () => originate({ data: { customerPhone: phone } }),
+    mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
     onSuccess: (r) => {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
@@ -277,6 +285,25 @@ function DialerPage() {
                   ? "Connected"
                   : ""}
             </div>
+            {(outboundDids.data?.length ?? 0) > 0 && !inCall && (
+              <div className="mt-2 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-neutral-400">
+                <span>Caller ID</span>
+                <select
+                  className="rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-100 focus:outline-none"
+                  value={outboundDidId}
+                  onChange={(e) => setOutboundDidId(e.target.value)}
+                >
+                  <option value="">
+                    {outboundDids.data?.find((d: any) => d.is_default)?.phone_number ?? "default"}
+                  </option>
+                  {outboundDids.data?.map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.phone_number}{d.label ? ` — ${d.label}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Keypad */}

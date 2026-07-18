@@ -43,6 +43,7 @@ function AuthenticatedShell() {
                   <Link to="/admin/agents" className="hover:underline">Agents</Link>
                   <Link to="/admin/contacts" className="hover:underline">Contacts</Link>
                   <Link to="/admin/inbound" className="hover:underline">Inbound</Link>
+                  <Link to="/admin/outbound" className="hover:underline">Outbound</Link>
                   <Link to="/admin/fields" className="hover:underline">CRM fields</Link>
                   <Link to="/admin/calls" className="hover:underline">All calls</Link>
                 </>

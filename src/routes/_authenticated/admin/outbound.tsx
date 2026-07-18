@@ -1,0 +1,168 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { useRole } from "@/hooks/use-role";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { listTelnyxNumbers } from "@/lib/telnyx.functions";
+import { upsertOutboundDid, deleteOutboundDid } from "@/lib/outbound.functions";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/admin/outbound")({
+  head: () => ({ meta: [{ title: "Admin — Outbound DIDs" }] }),
+  component: OutboundPage,
+});
+
+type DID = { id: string; phone_number: string; label: string | null; is_default: boolean };
+
+function OutboundPage() {
+  const { role } = useRole();
+  const qc = useQueryClient();
+  const upsert = useServerFn(upsertOutboundDid);
+  const remove = useServerFn(deleteOutboundDid);
+  const fetchTelnyx = useServerFn(listTelnyxNumbers);
+
+  const [selected, setSelected] = useState("");
+  const [label, setLabel] = useState("");
+
+  const dids = useQuery({
+    queryKey: ["outbound_dids"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("outbound_dids").select("*").order("phone_number");
+      if (error) throw error;
+      return (data ?? []) as DID[];
+    },
+  });
+
+  const telnyx = useQuery({
+    queryKey: ["telnyx-numbers"],
+    queryFn: () => fetchTelnyx(),
+    enabled: role === "admin",
+    retry: false,
+  });
+
+  const available = useMemo(() => {
+    const owned = new Set((dids.data ?? []).map((d) => d.phone_number));
+    return (telnyx.data ?? []).filter((n: any) => !owned.has(n.phone_number));
+  }, [telnyx.data, dids.data]);
+
+  const add = useMutation({
+    mutationFn: async () =>
+      upsert({ data: { phone_number: selected, label: label || null } }),
+    onSuccess: () => {
+      setSelected(""); setLabel("");
+      qc.invalidateQueries({ queryKey: ["outbound_dids"] });
+      toast.success("DID added");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed"),
+  });
+
+  const setDefault = useMutation({
+    mutationFn: async (d: DID) =>
+      upsert({ data: { id: d.id, phone_number: d.phone_number, label: d.label, is_default: true } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["outbound_dids"] }),
+    onError: (e: any) => toast.error(e.message ?? "Failed"),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: string) => remove({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["outbound_dids"] }),
+    onError: (e: any) => toast.error(e.message ?? "Failed"),
+  });
+
+  if (role !== "admin") return <div>Admin only.</div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Outbound Caller IDs</h1>
+        <p className="text-sm text-muted-foreground">
+          Numbers agents can present as Caller ID on outbound calls. Sourced live from Telnyx.
+        </p>
+      </div>
+
+      <div className="rounded border p-4 space-y-3">
+        <h2 className="font-medium">Add DID</h2>
+        <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">
+          <div>
+            <Label>Telnyx number</Label>
+            <select
+              className="w-full rounded border bg-background px-2 py-2 text-sm"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+            >
+              <option value="">
+                {telnyx.isLoading ? "Loading…" : telnyx.error ? "Telnyx unavailable — type below" : "Choose number"}
+              </option>
+              {available.map((n: any) => (
+                <option key={n.phone_number} value={n.phone_number}>
+                  {n.phone_number} {n.tag ? `— ${n.tag}` : ""}
+                </option>
+              ))}
+            </select>
+            <Input
+              className="mt-2"
+              placeholder="or enter manually (+14155551234)"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Label (optional)</Label>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Sales line" />
+          </div>
+          <div className="flex items-end">
+            <Button onClick={() => add.mutate()} disabled={!selected || add.isPending}>
+              {add.isPending ? "Saving…" : "Add"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left">
+            <tr>
+              <th className="p-2">Number</th>
+              <th className="p-2">Label</th>
+              <th className="p-2">Default</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(dids.data ?? []).map((d) => (
+              <tr key={d.id} className="border-t">
+                <td className="p-2 font-mono">{d.phone_number}</td>
+                <td className="p-2">{d.label ?? "—"}</td>
+                <td className="p-2">
+                  {d.is_default ? (
+                    <span className="rounded bg-primary/10 px-2 py-0.5 text-xs">DEFAULT</span>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setDefault.mutate(d)}>
+                      Make default
+                    </Button>
+                  )}
+                </td>
+                <td className="p-2 text-right">
+                  <Button size="sm" variant="ghost" onClick={() => del.mutate(d.id)}>
+                    Delete
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            {(dids.data ?? []).length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                  No outbound DIDs yet. Add one above.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
