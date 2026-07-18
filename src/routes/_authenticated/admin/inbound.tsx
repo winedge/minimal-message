@@ -58,6 +58,13 @@ function InboundPage() {
     },
   });
 
+  const telnyxNumbers = useQuery({
+    queryKey: ["telnyx-numbers"],
+    queryFn: () => fetchTelnyx(),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const saveMut = useMutation({
     mutationFn: async () => {
       if (!editing) return;
