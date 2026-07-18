@@ -11,8 +11,8 @@ if (!anon) {
 }
 
 export const supabase: SupabaseClient = createClient(
-  url ?? "http://localhost:54321",
-  anon ?? "public-anon-key",
+  url,
+  anon || "public-anon-key",
   {
     auth: {
       persistSession: true,
