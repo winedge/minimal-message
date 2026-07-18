@@ -214,6 +214,9 @@ function DialerPage() {
 
   const dial = useMutation({
     mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
+    onMutate: () => {
+      toast.info("Starting call…");
+    },
     onSuccess: (r) => {
       setActiveCallId(r.callId);
       setActiveChannel(r.channelId);
