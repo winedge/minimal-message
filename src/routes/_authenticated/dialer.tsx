@@ -51,6 +51,28 @@ function DialerPage() {
     },
   });
 
+  const todayStats = useQuery({
+    queryKey: ["dialer-today"],
+    queryFn: async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u) return { count: 0, talkSec: 0, answered: 0 };
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
+      const { data } = await supabase
+        .from("calls")
+        .select("id, duration_sec, status")
+        .eq("agent_id", u.id)
+        .gte("created_at", since.toISOString());
+      const rows = data ?? [];
+      return {
+        count: rows.length,
+        talkSec: rows.reduce((a: number, r: any) => a + (r.duration_sec ?? 0), 0),
+        answered: rows.filter((r: any) => r.status === "answered" || r.status === "ended").length,
+      };
+    },
+    refetchInterval: 15_000,
+  });
+
   const [phone, setPhone] = useState("");
   const [outboundDidId, setOutboundDidId] = useState<string>("");
   const outboundDids = useQuery({
