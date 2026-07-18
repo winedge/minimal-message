@@ -5,15 +5,20 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const eventsPolyfillPath = require.resolve("events/events.js");
 
 export default defineConfig({
   vite: {
     resolve: {
-      alias: {
+      alias: [
         // JsSIP depends on Node's `events` name, which must resolve to the
         // browser EventEmitter package in the client bundle.
-        events: "events/events.js",
-      },
+        { find: /^events$/, replacement: eventsPolyfillPath },
+        { find: /^node:events$/, replacement: eventsPolyfillPath },
+      ],
     },
   },
   tanstackStart: {
