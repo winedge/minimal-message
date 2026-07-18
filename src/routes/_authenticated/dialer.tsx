@@ -647,6 +647,23 @@ function DialerPage() {
   );
 }
 
+function CircleAction({ icon, label, onClick, active }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 text-[10px] uppercase tracking-wider text-neutral-400 active:scale-95"
+    >
+      <span
+        className={`flex h-14 w-14 items-center justify-center rounded-full ${active ? "bg-white text-neutral-900" : "bg-neutral-800 text-white"}`}
+      >
+        {icon}
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
