@@ -3,7 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { Softphone, type SoftphoneState, type IncomingCallInfo } from "@/lib/softphone";
+import {
+  Softphone,
+  testSoftphoneWebSocket,
+  type SoftphoneState,
+  type IncomingCallInfo,
+} from "@/lib/softphone";
 import { getSipCredentials, originateCall, hangupCall } from "@/lib/calls.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +65,7 @@ function DialerPage() {
   const [inputId, setInputId] = useState<string>("");
   const [outputId, setOutputId] = useState<string>("");
   const [showKeypad, setShowKeypad] = useState(false);
+  const [wsProbe, setWsProbe] = useState<string | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
 
   useEffect(() => {
@@ -112,6 +118,14 @@ function DialerPage() {
     softphoneRef.current?.reject();
     setIncoming(null);
   }, []);
+
+  const runWsProbe = useCallback(async () => {
+    if (!creds.data || creds.data.provisioned === false) return;
+    setWsProbe("Testing PBX WebSocket…");
+    const result = await testSoftphoneWebSocket(creds.data.wssUrl);
+    const suffix = result.code ? ` (close ${result.code}${result.reason ? `: ${result.reason}` : ""})` : "";
+    setWsProbe(`${result.ok ? "OK" : "FAILED"}: ${result.message}${suffix}. Origin: ${result.origin}. URL: ${result.url}`);
+  }, [creds.data]);
 
 
   const dial = useMutation({
@@ -289,6 +303,12 @@ function DialerPage() {
         </div>
 
         {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="space-y-2 border-t pt-3">
+          <Button type="button" variant="outline" size="sm" onClick={runWsProbe}>
+            Test PBX WebSocket
+          </Button>
+          {wsProbe && <p className="break-words text-xs text-muted-foreground">{wsProbe}</p>}
+        </div>
       </section>
 
 
