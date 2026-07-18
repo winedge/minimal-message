@@ -244,7 +244,14 @@ function DialerPage() {
     setActiveChannel(null);
     setActiveCallId(null);
     qc.invalidateQueries({ queryKey: ["history"] });
+    qc.invalidateQueries({ queryKey: ["dialer-today"] });
   }
+
+  const fmtDuration = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
 
   if (creds.isLoading) return <p className="text-muted-foreground">Loading softphone…</p>;
   if (creds.data && creds.data.provisioned === false) {
