@@ -51,7 +51,13 @@ tlsenable=yes
 tlsbindaddr=0.0.0.0:8089
 tlscertfile=/etc/asterisk/keys/fullchain.pem
 tlsprivatekey=/etc/asterisk/keys/privkey.pem
+allowed_origins=https://minimal-message.lovable.app,https://id-preview--26f42832-1131-4dbf-9ae3-890974080e25.lovable.app,https://26f42832-1131-4dbf-9ae3-890974080e25.lovableproject.com
 ```
+
+Browsers send the app's `Origin` header during WSS registration. If the
+softphone stays on `REGISTERING`, add the exact published/preview origins above
+to `http.conf`, then run `asterisk -rx "http reload"` and
+`asterisk -rx "pjsip reload"`.
 
 ## 5. `/etc/asterisk/ari.conf`
 
