@@ -49,10 +49,13 @@ export const originateCall = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sip } = await supabaseAdmin
       .from("sip_endpoints")
-      .select("extension")
+      .select("sip_username, extension")
       .eq("user_id", context.userId)
       .maybeSingle();
     if (!sip) throw new Error("SIP endpoint not provisioned for this agent");
+
+    const dialedNumber = data.customerPhone.replace(/[^0-9*#]/g, "");
+    if (dialedNumber.length < 3) throw new Error("Enter a valid phone number");
 
     // Resolve outbound Caller ID (DID). Preference: explicit id → default → agent extension.
     let callerNumber = sip.extension;
@@ -76,17 +79,26 @@ export const originateCall = createServerFn({ method: "POST" })
 
     const auth = Buffer.from(`${ariUser}:${ariPass}`).toString("base64");
     const body = {
-      endpoint: `PJSIP/${sip.extension}`,
-      extension: data.customerPhone,
+      endpoint: `PJSIP/${sip.sip_username}`,
+      extension: dialedNumber,
       context: "from-internal",
       priority: 1,
       callerId: `"Agent" <${callerNumber}>`,
+      timeout: 30,
       variables: {
         LOVABLE_CALL_ID: call.id,
         LOVABLE_AGENT_ID: context.userId,
         CALLERID_NUM: callerNumber,
+        CUSTOMER_PHONE: data.customerPhone,
       },
     };
+    console.log("[originateCall] dialing", {
+      callId: call.id,
+      endpoint: body.endpoint,
+      extension: body.extension,
+      context: body.context,
+      callerNumber,
+    });
     const res = await fetch(`${ariUrl.replace(/\/$/, "")}/channels`, {
       method: "POST",
       headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
@@ -98,9 +110,11 @@ export const originateCall = createServerFn({ method: "POST" })
         .from("calls")
         .update({ status: "failed", ended_at: new Date().toISOString() })
         .eq("id", call.id);
-      throw new Error(`ARI originate failed (${res.status}): ${text.slice(0, 200)}`);
+      console.error("[originateCall] ARI originate failed", res.status, text.slice(0, 500));
+      throw new Error(`Asterisk originate failed (${res.status}): ${text.slice(0, 300)}`);
     }
     const channel = (await res.json()) as { id: string };
+    console.log("[originateCall] ARI accepted", { callId: call.id, channelId: channel.id });
     await context.supabase
       .from("calls")
       .update({ asterisk_channel_id: channel.id })
