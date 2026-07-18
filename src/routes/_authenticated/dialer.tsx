@@ -74,7 +74,8 @@ function DialerPage() {
     refetchInterval: 15_000,
   });
 
-  const [phone, setPhone] = useState("");
+  const DEFAULT_PHONE = "+1";
+  const [phone, setPhone] = useState(DEFAULT_PHONE);
   const [outboundDidId, setOutboundDidId] = useState<string>("");
   const outboundDids = useQuery({
     queryKey: ["outbound_dids"],
