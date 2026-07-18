@@ -1,100 +1,57 @@
-# Manual Dialer Platform — Self-Hosted Supabase + Asterisk/Telnyx
+# Points 3, 5, 6 — Implementation Plan
 
-## Architecture
+## 3. Admin live monitoring polish
 
-```text
- ┌────────────┐    HTTPS      ┌──────────────────┐
- │  Browser   │──────────────▶│  Lovable app     │
- │ (agent /   │◀──────────────│  React + TSS     │
- │  admin)    │   WSS (SIP)   │                  │
- │            │◀────────┐     └───────┬──────────┘
- └─────┬──────┘         │             │ ARI (HTTPS)
-       │ RTP (audio)    │             ▼
-       ▼                │     ┌──────────────────┐   SIP/TLS + SRTP
- ┌─────────────┐        └─────│ Asterisk 20 VPS  │◀───────────────▶ Telnyx
- │  Telnyx     │◀─────────────│ res_pjsip + WSS  │
- │  PSTN       │              │ ARI + AMI        │
- └─────────────┘              └──────────────────┘
-                                       │ HMAC webhook
-                                       ▼
-                              ┌──────────────────┐
-                              │  Self-hosted     │
-                              │  Supabase (VPS)  │
-                              │  Postgres/GoTrue │
-                              │  Realtime/Store  │
-                              └──────────────────┘
-```
+**Agent presence**
+- New `agent_status` table: `user_id (pk)`, `status` (`available` | `on_call` | `offline`), `updated_at`.
+- Client heartbeat: while the softphone is registered, the dialer page upserts `status='available'` every 20s and on unmount marks `offline`. When `state==='in_call'` it marks `on_call`.
+- `/admin/live` subscribes to Postgres realtime on `agent_status` + `calls` and renders a live grid: agent, extension, status pill, current customer, call duration timer.
 
-- Browser softphone: **JsSIP** → `wss://pbx.yourdomain.com:8089/ws` on Asterisk `chan_pjsip`.
-- Dial: agent clicks Dial → server fn → Asterisk **ARI** `/channels` originates leg A (agent WebRTC) → leg B (Telnyx trunk).
-- Events: Asterisk **AMI** → small forwarder on VPS → signed POST to `/api/public/asterisk-events` → Postgres → Supabase Realtime → admin live view.
+**Listen / whisper / barge (ChanSpy)**
+- Add three admin server functions (`spyCall`, `whisperCall`, `bargeCall`) that call ARI `POST /channels` to originate a leg from the admin's own SIP extension into `ChanSpy(<agent_channel>,<mode>)` via a dialplan hook.
+- Dialplan snippet added to `docs/ASTERISK_SETUP.md`: `[lovable-spy]` context accepting `SPY_TARGET` + `SPY_MODE` (`q`, `qw`, `qB`).
+- Admin row gets three icon buttons enabled only when the agent is `on_call`.
 
-## Data model (Postgres via self-hosted Supabase)
+## 5. Contact / lead list
 
-- `profiles` (id, full_name)
-- `user_roles` (user_id, role) — separate table, `has_role()` security-definer fn
-- `sip_endpoints` (user_id, sip_username, sip_password_encrypted, extension)
-- `customers` (id, phone, created_by)
-- `crm_field_defs` (id, key, label, type, options jsonb, sort_order, required) — admin-defined
-- `crm_entries` (id, customer_id, call_id, agent_id, values jsonb)
-- `calls` (id, agent_id, customer_phone, status, started_at, answered_at, ended_at, duration, recording_url, asterisk_channel_id, asterisk_linkedid, disposition)
-- `agent_status` (user_id, state, updated_at)
-- All tables: GRANTs + RLS. Agents see own data. Admins see all via `has_role('admin')`.
+**Schema**
+- `contact_lists (id, name, created_by, created_at)`
+- `contacts (id, list_id, phone, first_name, last_name, email, notes, custom jsonb, created_at)` with RLS: admins read/write all; agents read all, no writes.
 
-## Screens
+**Admin CSV upload** at `/admin/contacts`
+- Upload `.csv` (papaparse), preview first 5 rows, map columns to `phone / first / last / email / notes`, bulk insert in 500-row chunks.
+- List management: create/rename/delete lists, delete rows.
 
-- `/auth` — email/password sign-in
-- `/_authenticated/dialer` — softphone (JsSIP) + dynamic CRM form
-- `/_authenticated/history` — agent's own call history + recordings
-- `/_authenticated/admin/agents` — create/disable agents, provision SIP creds
-- `/_authenticated/admin/fields` — CRM field builder
-- `/_authenticated/admin/live` — realtime status grid for all agents
-- `/_authenticated/admin/calls` — global call history, filters, export
+**Agent view** at `/dialer`
+- New left panel above the softphone: list selector + searchable contact table. Clicking a row fills the softphone number and prefills CRM fields (name, email) into the notes form.
+- Small "Recent" tab showing the agent's last 20 dialed customers.
 
-## Server functions & routes
+## 6. Inbound routing
 
-- `getSipCredentials()` — agent gets their own SIP username + password
-- `originateCall({ customerPhone })` — POST to Asterisk ARI
-- `hangupCall({ channelId })`
-- Admin: `createAgent`, `resetSipPassword`, `listAgents`, field CRUD
-- `/api/public/asterisk-events` — HMAC-verified webhook from AMI forwarder
+**Schema**
+- `inbound_routes (id, did text unique, strategy 'direct'|'roundrobin', target_user_id nullable, ring_group jsonb, ring_seconds int default 20)`
+- `inbound_state (did pk, last_agent_index int)` — round-robin cursor.
 
-## Self-hosted Supabase (on your VPS)
+**Admin UI** at `/admin/inbound`
+- Table of DIDs with strategy, agent picker (direct) or multi-select (round-robin), ring timeout.
 
-- Docker Compose from `supabase/docker` — Postgres, GoTrue, PostgREST, Realtime, Storage, Kong, Studio
-- Nginx/Caddy + Let's Encrypt in front of Kong on `supabase.yourdomain.com`
-- Daily pg_dump + storage backup cron
-- Migrations delivered as SQL under `supabase/migrations/`, applied with `supabase db push` or `psql`
+**Routing endpoint**
+- New public server route `POST /api/public/inbound-route` (HMAC-signed like the events webhook). Takes `{ did, callId }`, looks up the route, and returns `{ extension }` (direct) or picks the next available agent from `agent_status` (round-robin), advancing `last_agent_index`. Falls back to voicemail extension if none available.
+- Dialplan snippet in `docs/ASTERISK_SETUP.md`: the Telnyx inbound context uses `CURL()` to hit this endpoint, then `Dial(PJSIP/${extension},${ring_seconds})`.
 
-## Secrets you'll be asked to provide
+## Technical notes
 
-- `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (anon), `SUPABASE_SERVICE_ROLE_KEY`
-- `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (browser)
-- `ASTERISK_ARI_URL`, `ASTERISK_ARI_USER`, `ASTERISK_ARI_PASSWORD`
-- `ASTERISK_WEBHOOK_SECRET` (HMAC for AMI forwarder)
-- `SIP_ENCRYPTION_KEY` (auto-generated) — encrypts stored SIP passwords
-- Public browser config: `VITE_ASTERISK_WSS_URL`, `VITE_ASTERISK_SIP_DOMAIN`
+- All new tables get GRANTs (`authenticated` read, `service_role` all) plus RLS with `has_role('admin')` for writes.
+- Realtime uses the existing self-hosted Supabase — enable replication on `agent_status` and `calls` in a migration.
+- All admin server functions verify `has_role('admin')` before hitting ARI or `supabaseAdmin`.
+- ChanSpy needs a dialplan context; documented in `docs/ASTERISK_SETUP.md`, no code change on the VPS beyond editing `extensions.conf`.
 
-## Deliverables
+## Delivery order
 
-- Full schema migrations in `supabase/migrations/`
-- Hand-rolled Supabase integration in `src/integrations/supabase/`
-- All screens listed above
-- `docs/SUPABASE_SELFHOST_SETUP.md` — Docker install, TLS, backups, Google OAuth
-- `docs/ASTERISK_SETUP.md` — Asterisk 20 + Telnyx + WSS + ARI + AMI forwarder
+1. Migration: `agent_status`, `contact_lists`, `contacts`, `inbound_routes`, `inbound_state` + RLS + realtime.
+2. Live monitoring (presence + spy/whisper/barge).
+3. Contacts (admin upload + agent panel).
+4. Inbound routing (admin UI + `/api/public/inbound-route`).
+5. Update `docs/ASTERISK_SETUP.md` with the dialplan snippets.
 
-## Not in v1
-
-- Skills-based inbound routing (rings first available)
-- Admin whisper/barge (`ChanSpy`)
-- SMS via Telnyx
-- Caller-ID rotation
-
-## Build order
-
-1. Migrations + hand-rolled Supabase integration + auth gate
-2. Auth pages + role-based shell
-3. Admin: agents CRUD + SIP provisioning, CRM field builder
-4. Agent dialer + JsSIP softphone + dynamic CRM form
-5. Webhook route + realtime admin live + history
-6. Docs + AMI forwarder script
+Shall I proceed?

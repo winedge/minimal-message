@@ -110,6 +110,47 @@ function DialerPage() {
     }
   }, [state]);
 
+  // Heartbeat presence
+  useEffect(() => {
+    let cancelled = false;
+    const push = async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u || cancelled) return;
+      const s =
+        state === "in_call" || activeChannel
+          ? "on_call"
+          : state === "registered"
+            ? "available"
+            : "offline";
+      await supabase.from("agent_status").upsert({
+        user_id: u.id,
+        state: s,
+        current_call_id: activeCallId,
+        updated_at: new Date().toISOString(),
+      });
+    };
+    push();
+    const t = window.setInterval(push, 10_000);
+    const offline = async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u) return;
+      await supabase.from("agent_status").upsert({
+        user_id: u.id,
+        state: "offline",
+        current_call_id: null,
+        updated_at: new Date().toISOString(),
+      });
+    };
+    window.addEventListener("beforeunload", offline);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      window.removeEventListener("beforeunload", offline);
+      offline();
+    };
+  }, [state, activeChannel, activeCallId]);
+
+
   const acceptIncoming = useCallback(() => {
     softphoneRef.current?.answer();
     setIncoming(null);
@@ -374,27 +415,134 @@ function DialerPage() {
 
 
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="font-semibold">Call notes</h2>
-        {!fields.data?.length && (
-          <p className="text-sm text-muted-foreground">
-            No CRM fields yet. Ask an admin to add fields under CRM fields.
-          </p>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(fields.data ?? []).map((f) => (
-            <FieldInput
-              key={f.id}
-              field={f}
-              value={values[f.key]}
-              onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
-            />
-          ))}
-        </div>
-      </section>
+      <div className="space-y-4">
+        <ContactsPanel
+          disabled={!!activeChannel}
+          onPick={(p) => setPhone(p)}
+        />
+        <section className="space-y-4 rounded-lg border p-4">
+          <h2 className="font-semibold">Call notes</h2>
+          {!fields.data?.length && (
+            <p className="text-sm text-muted-foreground">
+              No CRM fields yet. Ask an admin to add fields under CRM fields.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(fields.data ?? []).map((f) => (
+              <FieldInput
+                key={f.id}
+                field={f}
+                value={values[f.key]}
+                onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
+
+type ContactRow = {
+  id: string;
+  phone: string;
+  first_name: string | null;
+  last_name: string | null;
+  list_id: string | null;
+};
+
+function ContactsPanel({
+  onPick,
+  disabled,
+}: {
+  onPick: (phone: string) => void;
+  disabled: boolean;
+}) {
+  const [lists, setLists] = useState<{ id: string; name: string }[]>([]);
+  const [listId, setListId] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState<ContactRow[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("contact_lists")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => setLists((data ?? []) as any));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      let query = supabase
+        .from("contacts")
+        .select("id, phone, first_name, last_name, list_id")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (listId) query = query.eq("list_id", listId);
+      if (q.trim()) {
+        const s = q.trim();
+        query = query.or(
+          `phone.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%`,
+        );
+      }
+      const { data } = await query;
+      if (!cancelled) setRows((data ?? []) as ContactRow[]);
+    };
+    const t = setTimeout(run, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q, listId]);
+
+  return (
+    <section className="space-y-3 rounded-lg border p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">Contacts</h2>
+        <select
+          className="rounded-md border bg-background px-2 py-1 text-xs"
+          value={listId}
+          onChange={(e) => setListId(e.target.value)}
+        >
+          <option value="">All lists</option>
+          {lists.map((l) => (
+            <option key={l.id} value={l.id}>{l.name}</option>
+          ))}
+        </select>
+      </div>
+      <Input
+        placeholder="Search name or number"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      <ul className="max-h-64 divide-y overflow-y-auto rounded border">
+        {rows.map((c) => (
+          <li key={c.id} className="flex items-center justify-between px-3 py-2 text-sm">
+            <div>
+              <div>{[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}</div>
+              <div className="font-mono text-xs text-muted-foreground">{c.phone}</div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disabled}
+              onClick={() => onPick(c.phone)}
+            >
+              Load
+            </Button>
+          </li>
+        ))}
+        {!rows.length && (
+          <li className="px-3 py-4 text-center text-xs text-muted-foreground">
+            No contacts.
+          </li>
+        )}
+      </ul>
+    </section>
+  );
+}
+
 
 function FieldInput({
   field,
