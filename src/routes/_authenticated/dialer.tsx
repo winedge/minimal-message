@@ -609,9 +609,9 @@ function ContactsPanel({
   }, [q, listId]);
 
   return (
-    <section className="space-y-3 rounded-lg border p-4">
+    <section className="space-y-3 rounded-xl border bg-card p-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Contacts</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Contacts</h2>
         <select
           className="rounded-md border bg-background px-2 py-1 text-xs"
           value={listId}
@@ -623,30 +623,42 @@ function ContactsPanel({
           ))}
         </select>
       </div>
-      <Input
-        placeholder="Search name or number"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <ul className="max-h-64 divide-y overflow-y-auto rounded border">
-        {rows.map((c) => (
-          <li key={c.id} className="flex items-center justify-between px-3 py-2 text-sm">
-            <div>
-              <div>{[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}</div>
-              <div className="font-mono text-xs text-muted-foreground">{c.phone}</div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => onPick(c.phone)}
-            >
-              Load
-            </Button>
-          </li>
-        ))}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search name or number"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+      <ul className="max-h-[520px] divide-y overflow-y-auto rounded-lg border">
+        {rows.map((c) => {
+          const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown";
+          const initials = name === "Unknown" ? "?" : name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+          return (
+            <li key={c.id} className="group flex items-center gap-3 px-3 py-2.5 text-sm transition hover:bg-muted/50">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{name}</div>
+                <div className="truncate font-mono text-xs text-muted-foreground">{c.phone}</div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onPick(c.phone)}
+                className="opacity-70 group-hover:opacity-100"
+              >
+                <Phone className="mr-1 h-3.5 w-3.5" /> Dial
+              </Button>
+            </li>
+          );
+        })}
         {!rows.length && (
-          <li className="px-3 py-4 text-center text-xs text-muted-foreground">
+          <li className="px-3 py-6 text-center text-xs text-muted-foreground">
             No contacts.
           </li>
         )}
