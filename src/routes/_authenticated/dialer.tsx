@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mic, MicOff, Pause, Play, PhoneOff, Phone } from "lucide-react";
+import { Mic, MicOff, Pause, Play, PhoneOff, Phone, Search, Clock, PhoneCall, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dialer")({
   head: () => ({ meta: [{ title: "Dialer" }] }),
@@ -49,6 +49,29 @@ function DialerPage() {
       if (error) throw error;
       return (data ?? []) as FieldDef[];
     },
+  });
+
+  const todayStats = useQuery({
+    queryKey: ["dialer-today"],
+    queryFn: async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u) return { count: 0, talkSec: 0, answered: 0 };
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from("calls")
+        .select("id, duration_sec, status")
+        .eq("agent_id", u.id)
+        .gte("created_at", since.toISOString());
+      if (error) return { count: 0, talkSec: 0, answered: 0 };
+      const rows = data ?? [];
+      return {
+        count: rows.length,
+        talkSec: rows.reduce((a: number, r: any) => a + (r.duration_sec ?? 0), 0),
+        answered: rows.filter((r: any) => r.status === "answered" || r.status === "ended").length,
+      };
+    },
+    refetchInterval: 15_000,
   });
 
   const [phone, setPhone] = useState("");
@@ -221,7 +244,14 @@ function DialerPage() {
     setActiveChannel(null);
     setActiveCallId(null);
     qc.invalidateQueries({ queryKey: ["history"] });
+    qc.invalidateQueries({ queryKey: ["dialer-today"] });
   }
+
+  const fmtDuration = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
 
   if (creds.isLoading) return <p className="text-muted-foreground">Loading softphone…</p>;
   if (creds.data && creds.data.provisioned === false) {
@@ -256,9 +286,35 @@ function DialerPage() {
         ? "bg-red-500"
         : "bg-amber-500";
 
+  const stats = todayStats.data ?? { count: 0, talkSec: 0, answered: 0 };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <section className="mx-auto w-full max-w-[340px] space-y-4">
+    <div className="space-y-6">
+      {/* Top status bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
+        <div className="flex items-center gap-3">
+          <span className={`relative flex h-3 w-3`}>
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${statusColor}`} />
+            <span className={`relative inline-flex h-3 w-3 rounded-full ${statusColor}`} />
+          </span>
+          <div>
+            <div className="text-sm font-semibold leading-tight">{statusLabel[state]}</div>
+            <div className="text-xs text-muted-foreground">
+              {creds.data?.provisioned ? `Extension ${creds.data.extension}` : "Not provisioned"}
+              {inCall && phone ? ` · ${phone}` : ""}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <StatChip icon={<PhoneCall className="h-3.5 w-3.5" />} label="Calls today" value={String(stats.count)} />
+          <StatChip icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Answered" value={String(stats.answered)} />
+          <StatChip icon={<Clock className="h-3.5 w-3.5" />} label="Talk time" value={fmtDuration(stats.talkSec)} />
+        </div>
+      </div>
+
+    <div className="grid gap-6 lg:grid-cols-[280px_360px_1fr]">
+      <section className="mx-auto w-full max-w-[340px] space-y-4 lg:order-2">
+
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
           {/* Screen */}
@@ -453,33 +509,51 @@ function DialerPage() {
 
 
 
-      <div className="space-y-4">
+      <div className="lg:order-1">
         <ContactsPanel
           disabled={!!activeChannel}
           onPick={(p) => setPhone(p)}
         />
-        <section className="space-y-4 rounded-lg border p-4">
-          <h2 className="font-semibold">Call notes</h2>
-          {!fields.data?.length && (
-            <p className="text-sm text-muted-foreground">
-              No CRM fields yet. Ask an admin to add fields under CRM fields.
-            </p>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(fields.data ?? []).map((f) => (
-              <FieldInput
-                key={f.id}
-                field={f}
-                value={values[f.key]}
-                onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
-              />
-            ))}
-          </div>
-        </section>
+      </div>
+
+      <section className="space-y-4 rounded-xl border bg-card p-5 lg:order-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Call notes</h2>
+          {inCall && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">Recording notes</span>}
+        </div>
+        {!fields.data?.length && (
+          <p className="text-sm text-muted-foreground">
+            No CRM fields yet. Ask an admin to add fields under CRM fields.
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(fields.data ?? []).map((f) => (
+            <FieldInput
+              key={f.id}
+              field={f}
+              value={values[f.key]}
+              onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+    </div>
+  );
+}
+
+function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
+      <span className="text-muted-foreground">{icon}</span>
+      <div className="leading-tight">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-sm font-semibold tabular-nums">{value}</div>
       </div>
     </div>
   );
 }
+
 
 type ContactRow = {
   id: string;
@@ -535,9 +609,9 @@ function ContactsPanel({
   }, [q, listId]);
 
   return (
-    <section className="space-y-3 rounded-lg border p-4">
+    <section className="space-y-3 rounded-xl border bg-card p-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Contacts</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Contacts</h2>
         <select
           className="rounded-md border bg-background px-2 py-1 text-xs"
           value={listId}
@@ -549,30 +623,42 @@ function ContactsPanel({
           ))}
         </select>
       </div>
-      <Input
-        placeholder="Search name or number"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <ul className="max-h-64 divide-y overflow-y-auto rounded border">
-        {rows.map((c) => (
-          <li key={c.id} className="flex items-center justify-between px-3 py-2 text-sm">
-            <div>
-              <div>{[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}</div>
-              <div className="font-mono text-xs text-muted-foreground">{c.phone}</div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => onPick(c.phone)}
-            >
-              Load
-            </Button>
-          </li>
-        ))}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search name or number"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+      <ul className="max-h-[520px] divide-y overflow-y-auto rounded-lg border">
+        {rows.map((c) => {
+          const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown";
+          const initials = name === "Unknown" ? "?" : name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+          return (
+            <li key={c.id} className="group flex items-center gap-3 px-3 py-2.5 text-sm transition hover:bg-muted/50">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{name}</div>
+                <div className="truncate font-mono text-xs text-muted-foreground">{c.phone}</div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onPick(c.phone)}
+                className="opacity-70 group-hover:opacity-100"
+              >
+                <Phone className="mr-1 h-3.5 w-3.5" /> Dial
+              </Button>
+            </li>
+          );
+        })}
         {!rows.length && (
-          <li className="px-3 py-4 text-center text-xs text-muted-foreground">
+          <li className="px-3 py-6 text-center text-xs text-muted-foreground">
             No contacts.
           </li>
         )}
