@@ -63,13 +63,6 @@ function AuthPage() {
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
         </Button>
-        <button
-          type="button"
-          onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setInfo(null); }}
-          className="w-full text-xs text-muted-foreground underline"
-        >
-          {mode === "signin" ? "No account? Sign up (bootstrap first admin)" : "Have an account? Sign in"}
-        </button>
         <p className="text-xs text-muted-foreground">
           Return <Link to="/" className="underline">home</Link>.
         </p>
