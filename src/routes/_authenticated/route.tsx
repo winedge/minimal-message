@@ -1,8 +1,11 @@
 import { createFileRoute, Outlet, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole, useSession } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
+import { useServerFn } from "@tanstack/react-start";
+import { claimFirstAdmin } from "@/lib/admin.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -62,13 +65,40 @@ function AuthenticatedShell() {
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">
         {role === null ? (
-          <div className="rounded border p-6 text-sm">
-            Your account has no role assigned yet. Ask an admin to add you as an agent.
-          </div>
+          <NoRoleBlock />
         ) : (
           <Outlet />
         )}
       </main>
+    </div>
+  );
+}
+
+function NoRoleBlock() {
+  const claim = useServerFn(claimFirstAdmin);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="space-y-4 rounded border p-6 text-sm">
+      <p>Your account has no role assigned yet.</p>
+      <p className="text-muted-foreground text-xs">
+        If this is a fresh install with no admin yet, claim admin below. Otherwise ask an existing admin to add you as an agent.
+      </p>
+      <Button
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await claim();
+            toast.success("You are now admin — reloading");
+            setTimeout(() => window.location.reload(), 600);
+          } catch (e: any) {
+            toast.error(e.message ?? "Failed");
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Claiming…" : "Claim first admin"}
+      </Button>
     </div>
   );
 }
