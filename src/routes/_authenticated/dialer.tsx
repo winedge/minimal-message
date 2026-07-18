@@ -119,6 +119,14 @@ function DialerPage() {
         toast.error(m);
       },
       onIncoming: (info) => {
+        // If we just initiated an outbound originate, Asterisk calls the agent
+        // endpoint first (appears as incoming). Auto-answer and don't show the
+        // incoming UI.
+        if (pendingOutboundRef.current) {
+          pendingOutboundRef.current = false;
+          setTimeout(() => softphoneRef.current?.answer(), 0);
+          return;
+        }
         setIncoming(info);
         toast.info(`Incoming call from ${info.displayName ?? info.from}`);
       },
