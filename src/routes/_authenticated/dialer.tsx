@@ -110,6 +110,47 @@ function DialerPage() {
     }
   }, [state]);
 
+  // Heartbeat presence
+  useEffect(() => {
+    let cancelled = false;
+    const push = async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u || cancelled) return;
+      const s =
+        state === "in_call" || activeChannel
+          ? "on_call"
+          : state === "registered"
+            ? "available"
+            : "offline";
+      await supabase.from("agent_status").upsert({
+        user_id: u.id,
+        state: s,
+        current_call_id: activeCallId,
+        updated_at: new Date().toISOString(),
+      });
+    };
+    push();
+    const t = window.setInterval(push, 10_000);
+    const offline = async () => {
+      const u = (await supabase.auth.getUser()).data.user;
+      if (!u) return;
+      await supabase.from("agent_status").upsert({
+        user_id: u.id,
+        state: "offline",
+        current_call_id: null,
+        updated_at: new Date().toISOString(),
+      });
+    };
+    window.addEventListener("beforeunload", offline);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      window.removeEventListener("beforeunload", offline);
+      offline();
+    };
+  }, [state, activeChannel, activeCallId]);
+
+
   const acceptIncoming = useCallback(() => {
     softphoneRef.current?.answer();
     setIncoming(null);
