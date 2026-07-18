@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mic, MicOff, Pause, Play, PhoneOff, Phone } from "lucide-react";
+import { Mic, MicOff, Pause, Play, PhoneOff, Phone, Search, Clock, PhoneCall, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dialer")({
   head: () => ({ meta: [{ title: "Dialer" }] }),
