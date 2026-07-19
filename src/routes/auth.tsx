@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Sign in — Dialer" }] }),
+  head: () => ({ meta: [{ title: "Sign in — AiDialX Lite" }] }),
   component: AuthPage,
 });
 
