@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import { toast } from "sonner";
-import { Menu, X } from "lucide-react";
+import { Menu, X, PhoneCall, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -30,47 +30,104 @@ function AuthenticatedShell() {
 
   const isAdmin = role === "admin";
 
-  const navLinks = (
+  const mainLinks = [
+    { to: "/dialer", label: "Dialer" },
+    { to: "/history", label: "History" },
+  ] as const;
+  const adminLinks = [
+    { to: "/admin/live", label: "Live" },
+    { to: "/admin/agents", label: "Agents" },
+    { to: "/admin/contacts", label: "Contacts" },
+    { to: "/admin/inbound", label: "Inbound" },
+    { to: "/admin/outbound", label: "Outbound" },
+    { to: "/admin/fields", label: "CRM fields" },
+    { to: "/admin/calls", label: "All calls" },
+  ] as const;
+
+  const navLinkClass =
+    "rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary [&.active]:font-medium";
+
+  const desktopNav = (
+    <nav className="hidden items-center gap-1 lg:flex">
+      {mainLinks.map((l) => (
+        <Link key={l.to} to={l.to} className={navLinkClass} activeOptions={{ exact: true }}>
+          {l.label}
+        </Link>
+      ))}
+      {isAdmin && (
+        <div className="relative ml-1 border-l pl-2">
+          <div className="flex items-center gap-1">
+            <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin</span>
+            {adminLinks.map((l) => (
+              <Link key={l.to} to={l.to} className={navLinkClass} activeOptions={{ exact: true }}>
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+
+  const mobileNav = (
     <>
-      <Link to="/dialer" onClick={() => setMenuOpen(false)} className="hover:underline">Dialer</Link>
-      <Link to="/history" onClick={() => setMenuOpen(false)} className="hover:underline">History</Link>
+      {mainLinks.map((l) => (
+        <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} className={navLinkClass}>
+          {l.label}
+        </Link>
+      ))}
       {isAdmin && (
         <>
-          <Link to="/admin/live" onClick={() => setMenuOpen(false)} className="hover:underline">Live</Link>
-          <Link to="/admin/agents" onClick={() => setMenuOpen(false)} className="hover:underline">Agents</Link>
-          <Link to="/admin/contacts" onClick={() => setMenuOpen(false)} className="hover:underline">Contacts</Link>
-          <Link to="/admin/inbound" onClick={() => setMenuOpen(false)} className="hover:underline">Inbound</Link>
-          <Link to="/admin/outbound" onClick={() => setMenuOpen(false)} className="hover:underline">Outbound</Link>
-          <Link to="/admin/fields" onClick={() => setMenuOpen(false)} className="hover:underline">CRM fields</Link>
-          <Link to="/admin/calls" onClick={() => setMenuOpen(false)} className="hover:underline">All calls</Link>
+          <div className="mt-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin</div>
+          {adminLinks.map((l) => (
+            <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} className={navLinkClass}>
+              {l.label}
+            </Link>
+          ))}
         </>
       )}
     </>
   );
 
+  const initials = (session.email ?? "?").slice(0, 2).toUpperCase();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link to="/" className="font-semibold shrink-0">AiDialX Lite</Link>
-            <nav className="hidden items-center gap-4 text-sm lg:flex">
-              {navLinks}
-            </nav>
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link to="/" className="group flex shrink-0 items-center gap-2">
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm shadow-primary/30 ring-1 ring-primary/20 transition-transform group-hover:scale-105">
+                <PhoneCall className="h-4 w-4" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
+              </span>
+              <span className="flex flex-col leading-none">
+                <span className="text-[15px] font-semibold tracking-tight">AiDialX <span className="text-primary">Lite</span></span>
+                <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:inline">Agent console</span>
+              </span>
+            </Link>
+            {desktopNav}
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="hidden text-muted-foreground sm:inline max-w-[160px] truncate">{session.email}</span>
-            <span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase">{role ?? "no role"}</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border bg-card px-2 py-1 pr-3 sm:flex">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                {initials}
+              </span>
+              <span className="max-w-[140px] truncate text-xs text-foreground">{session.email}</span>
+              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${isAdmin ? "bg-amber-500/15 text-amber-600" : role === "agent" ? "bg-sky-500/15 text-sky-600" : "bg-muted text-muted-foreground"}`}>
+                {role ?? "no role"}
+              </span>
+            </div>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               className="hidden sm:inline-flex"
               onClick={async () => {
                 await supabase.auth.signOut();
                 navigate({ to: "/auth", replace: true });
               }}
             >
-              Sign out
+              <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign out
             </Button>
             <button
               type="button"
@@ -83,11 +140,16 @@ function AuthenticatedShell() {
           </div>
         </div>
         {menuOpen && (
-          <div className="border-t lg:hidden">
-            <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-3 py-3 text-sm">
-              {navLinks}
-              <div className="mt-2 flex items-center justify-between border-t pt-3 sm:hidden">
-                <span className="truncate text-xs text-muted-foreground">{session.email}</span>
+          <div className="border-t bg-background lg:hidden">
+            <nav className="mx-auto flex max-w-6xl flex-col gap-0.5 px-3 py-3">
+              {mobileNav}
+              <div className="mt-3 flex items-center justify-between border-t pt-3 sm:hidden">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                    {initials}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">{session.email}</span>
+                </div>
                 <Button
                   size="sm"
                   variant="outline"
@@ -96,7 +158,7 @@ function AuthenticatedShell() {
                     navigate({ to: "/auth", replace: true });
                   }}
                 >
-                  Sign out
+                  <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign out
                 </Button>
               </div>
             </nav>
