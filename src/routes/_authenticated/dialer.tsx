@@ -821,9 +821,17 @@ function ContactsPanel({
   }, [q, listId]);
 
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Contacts</h2>
+    <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Phone className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold">Contacts</h2>
+            <p className="text-xs text-muted-foreground">{rows.length} shown</p>
+          </div>
+        </div>
         <select
           className="rounded-md border bg-background px-2 py-1 text-xs"
           value={listId}
@@ -835,6 +843,7 @@ function ContactsPanel({
           ))}
         </select>
       </div>
+
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
