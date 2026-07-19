@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { claimFirstAdmin } from "@/lib/admin.functions";
 import { toast } from "sonner";
-import { Menu, X, PhoneCall, LogOut } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
