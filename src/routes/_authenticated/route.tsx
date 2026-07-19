@@ -97,10 +97,6 @@ function AuthenticatedShell() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 items-center gap-4">
             <Link to="/" className="group flex shrink-0 items-center gap-2">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm shadow-primary/30 ring-1 ring-primary/20 transition-transform group-hover:scale-105">
-                <PhoneCall className="h-4 w-4" />
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-background" />
-              </span>
               <span className="flex flex-col leading-none">
                 <span className="text-[15px] font-semibold tracking-tight">AiDialX <span className="text-primary">Lite</span></span>
                 <span className="hidden text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:inline">Agent console</span>
