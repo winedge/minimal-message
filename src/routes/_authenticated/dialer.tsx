@@ -738,17 +738,24 @@ function CircleAction({ icon, label, onClick, active }: { icon: React.ReactNode;
   );
 }
 
-function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatChip({ icon, label, value, tone = "primary" }: { icon: React.ReactNode; label: string; value: string; tone?: "primary" | "emerald" | "sky" | "amber" }) {
+  const toneMap: Record<string, string> = {
+    primary: "bg-primary/10 text-primary",
+    emerald: "bg-emerald-500/10 text-emerald-600",
+    sky: "bg-sky-500/10 text-sky-600",
+    amber: "bg-amber-500/10 text-amber-600",
+  };
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5">
-      <span className="text-muted-foreground">{icon}</span>
+    <div className="flex items-center gap-2.5 rounded-xl border bg-card/80 px-3 py-2 backdrop-blur">
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${toneMap[tone]}`}>{icon}</span>
       <div className="leading-tight">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className="text-sm font-semibold tabular-nums">{value}</div>
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-base font-semibold tabular-nums">{value}</div>
       </div>
     </div>
   );
 }
+
 
 
 type ContactRow = {
