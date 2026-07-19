@@ -142,6 +142,7 @@ export const deleteField = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("crm_field_defs").delete().eq("id", data.id);
+    const { error } = await supabaseAdmin.from("crm_field_defs").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
