@@ -127,9 +127,11 @@ export const upsertField = createServerFn({ method: "POST" })
       options: data.field.options ? data.field.options : null,
     };
     if (data.id) {
-      await supabaseAdmin.from("crm_field_defs").update(payload).eq("id", data.id);
+      const { error } = await supabaseAdmin.from("crm_field_defs").update(payload).eq("id", data.id);
+      if (error) throw new Error(error.message);
     } else {
-      await supabaseAdmin.from("crm_field_defs").insert(payload);
+      const { error } = await supabaseAdmin.from("crm_field_defs").insert(payload);
+      if (error) throw new Error(error.message);
     }
     return { ok: true };
   });
@@ -140,6 +142,7 @@ export const deleteField = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("crm_field_defs").delete().eq("id", data.id);
+    const { error } = await supabaseAdmin.from("crm_field_defs").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
