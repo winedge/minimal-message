@@ -389,29 +389,40 @@ function DialerPage() {
       : "Calling…"
     : statusLabel[state];
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const agentName = creds.data?.provisioned ? `Ext ${creds.data.extension}` : "Agent";
+  const answerRate = stats.count > 0 ? Math.round((stats.answered / stats.count) * 100) : 0;
+  const online = state === "registered" || state === "in_call";
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Top status bar */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-card p-3 sm:flex sm:flex-wrap sm:justify-between sm:p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="relative flex h-3 w-3 shrink-0">
-            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${statusColor}`} />
-            <span className={`relative inline-flex h-3 w-3 rounded-full ${statusColor}`} />
-          </span>
+    <div className="space-y-5 sm:space-y-6">
+      {/* Hero header */}
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-6">
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold leading-tight">{visibleStatusLabel}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {creds.data?.provisioned ? `Ext ${creds.data.extension}` : "Not provisioned"}
-              {inCall && phone ? ` · ${phone}` : ""}
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{greeting}</div>
+            <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight sm:text-3xl">{agentName}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${online ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-600"}`}>
+                {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                {visibleStatusLabel}
+              </span>
+              {inCall && phone && (
+                <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs">{phone}</span>
+              )}
             </div>
           </div>
-        </div>
-        <div className="col-span-2 grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-3">
-          <StatChip icon={<PhoneCall className="h-3.5 w-3.5" />} label="Calls" value={String(stats.count)} />
-          <StatChip icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Answered" value={String(stats.answered)} />
-          <StatChip icon={<Clock className="h-3.5 w-3.5" />} label="Talk" value={fmtDuration(stats.talkSec)} />
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4 sm:gap-3">
+            <StatChip icon={<PhoneCall className="h-4 w-4" />} label="Calls today" value={String(stats.count)} tone="primary" />
+            <StatChip icon={<CheckCircle2 className="h-4 w-4" />} label="Answered" value={String(stats.answered)} tone="emerald" />
+            <StatChip icon={<Clock className="h-4 w-4" />} label="Talk time" value={fmtDuration(stats.talkSec)} tone="sky" />
+            <StatChip icon={<TrendingUp className="h-4 w-4" />} label="Answer rate" value={`${answerRate}%`} tone="amber" />
+          </div>
         </div>
       </div>
+
 
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_360px_1fr]">
       <section className="mx-auto w-full max-w-[360px] space-y-4 lg:order-2">
