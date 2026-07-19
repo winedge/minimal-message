@@ -53,7 +53,7 @@ function AuthenticatedShell() {
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-6">
-            <Link to="/" className="font-semibold shrink-0">Dialer</Link>
+            <Link to="/" className="font-semibold shrink-0">AiDialX Lite</Link>
             <nav className="hidden items-center gap-4 text-sm lg:flex">
               {navLinks}
             </nav>
