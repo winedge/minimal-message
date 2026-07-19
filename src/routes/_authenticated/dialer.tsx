@@ -695,11 +695,20 @@ function DialerPage() {
         />
       </div>
 
-      <section className="space-y-4 rounded-xl border bg-card p-5 lg:order-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Call notes</h2>
-          {inCall && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600">Recording notes</span>}
+      <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm lg:order-3">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <StickyNote className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold">Call notes</h2>
+              <p className="text-xs text-muted-foreground">Capture details during the call</p>
+            </div>
+          </div>
+          {inCall && <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Live</span>}
         </div>
+
         {!fields.data?.length && (
           <p className="text-sm text-muted-foreground">
             No CRM fields yet. Ask an admin to add fields under CRM fields.
