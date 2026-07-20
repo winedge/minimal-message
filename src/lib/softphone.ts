@@ -340,6 +340,7 @@ export class Softphone {
 
   stop() {
     this.clearRegistrationTimer();
+    this.stopRingback();
     this.hangup();
     try { this.ua?.stop(); } catch {}
     this.ua = null;
