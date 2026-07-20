@@ -81,7 +81,7 @@ export const originateCall = createServerFn({ method: "POST" })
     const body = {
       endpoint: `PJSIP/${sip.sip_username}`,
       extension: dialedNumber,
-      context: "from-internal",
+      context: "lovable-outbound",
       priority: 1,
       callerId: `"Agent" <${callerNumber}>`,
       timeout: 30,
