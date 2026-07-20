@@ -285,6 +285,59 @@ export class Softphone {
     this.ringAudioCtx = null;
   }
 
+  // --- Ringback tone (played locally while waiting for the callee to answer) ---
+  private ringbackCtx: AudioContext | null = null;
+  private ringbackTimer: number | null = null;
+  private ringbackNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
+
+  startRingback() {
+    if (typeof window === "undefined") return;
+    if (this.ringbackCtx) return;
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx: AudioContext = new Ctx();
+      this.ringbackCtx = ctx;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(ctx.destination);
+      // US ringback: 440Hz + 480Hz, 2s on / 4s off
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.frequency.value = 440;
+      osc2.frequency.value = 480;
+      osc1.connect(gain);
+      osc2.connect(gain);
+      osc1.start();
+      osc2.start();
+      this.ringbackNodes = [
+        { osc: osc1, gain },
+        { osc: osc2, gain },
+      ];
+      const cycle = () => {
+        if (!this.ringbackCtx) return;
+        const t = this.ringbackCtx.currentTime;
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.15, t + 0.05);
+        gain.gain.setValueAtTime(0.15, t + 2);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.05);
+      };
+      cycle();
+      this.ringbackTimer = window.setInterval(cycle, 6000);
+    } catch {}
+  }
+
+  stopRingback() {
+    if (this.ringbackTimer) {
+      clearInterval(this.ringbackTimer);
+      this.ringbackTimer = null;
+    }
+    this.ringbackNodes.forEach(({ osc }) => { try { osc.stop(); } catch {} });
+    this.ringbackNodes = [];
+    try { this.ringbackCtx?.close(); } catch {}
+    this.ringbackCtx = null;
+  }
+
   stop() {
     this.clearRegistrationTimer();
     this.hangup();
