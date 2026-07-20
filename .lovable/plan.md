@@ -1,57 +1,57 @@
-# Points 3, 5, 6 — Implementation Plan
+# Switch telephony from Asterisk to Twilio Voice (backed by Lovable Cloud)
 
-## 3. Admin live monitoring polish
+Asterisk on your VPS is fighting you (SIP scanners, dialplan drift, TLS errors, enum migrations). Let's park it and get a working dialer using **Twilio Programmable Voice** with **Lovable Cloud** hosting the backend. You keep the same UI, agent list, call history, admin monitoring — only the call path changes.
 
-**Agent presence**
-- New `agent_status` table: `user_id (pk)`, `status` (`available` | `on_call` | `offline`), `updated_at`.
-- Client heartbeat: while the softphone is registered, the dialer page upserts `status='available'` every 20s and on unmount marks `offline`. When `state==='in_call'` it marks `on_call`.
-- `/admin/live` subscribes to Postgres realtime on `agent_status` + `calls` and renders a live grid: agent, extension, status pill, current customer, call duration timer.
+## Why this works
+- **Browser calling**: Twilio Voice JS SDK runs in the agent's browser — no SIP, no WSS, no PJSIP endpoints to maintain.
+- **Carrier included**: Twilio is both the SDK and the PSTN carrier. Buy a number in their console, done.
+- **Lovable Cloud** hosts: auth, `calls`/`contacts`/`agent_status` tables, and the small server functions that mint Twilio access tokens and receive status webhooks.
+- **No VPS required** for the app to work. You can decommission Asterisk later or keep it idle.
 
-**Listen / whisper / barge (ChanSpy)**
-- Add three admin server functions (`spyCall`, `whisperCall`, `bargeCall`) that call ARI `POST /channels` to originate a leg from the admin's own SIP extension into `ChanSpy(<agent_channel>,<mode>)` via a dialplan hook.
-- Dialplan snippet added to `docs/ASTERISK_SETUP.md`: `[lovable-spy]` context accepting `SPY_TARGET` + `SPY_MODE` (`q`, `qw`, `qB`).
-- Admin row gets three icon buttons enabled only when the agent is `on_call`.
+## What stays the same
+- All existing UI: `/dialer`, `/admin/live`, `/admin/calls`, `/admin/contacts`, `/admin/outbound`, `/admin/inbound`, CRM fields.
+- Data model: `calls`, `contacts`, `agent_status`, `outbound_dids`, `inbound_routes`, `user_roles`.
+- Admin flows: live monitoring, call history, CSV import, caller-ID selection.
 
-## 5. Contact / lead list
+## What changes
+- Remove `src/lib/softphone.ts` JsSIP layer. Replace with Twilio Voice SDK (`@twilio/voice-sdk`) wrapper exposing the same shape (`register/dial/hangup/mute/hold/sendDtmf/onIncoming`) so the dialer UI is a near drop-in.
+- Replace `originateCall`/`hangupCall` server fns with:
+  - `getVoiceToken` — mints a Twilio JWT capability token for the agent.
+  - `logCallStart` — inserts the placeholder `calls` row (same schema).
+- Replace Asterisk webhook (`/api/public/asterisk-events`) with `/api/public/twilio-voice` and `/api/public/twilio-status`:
+  - `twilio-voice` returns TwiML that dials the customer with the selected outbound DID as caller ID.
+  - `twilio-status` receives `initiated/ringing/answered/completed` callbacks and updates the `calls` row — same status transitions the UI already handles.
+- Inbound: point the Twilio number's Voice webhook at `/api/public/twilio-voice-inbound`, which returns TwiML that `<Dial><Client>agent_<uuid></Client></Dial>` using the existing round-robin logic from `inbound_routes`.
 
-**Schema**
-- `contact_lists (id, name, created_by, created_at)`
-- `contacts (id, list_id, phone, first_name, last_name, email, notes, custom jsonb, created_at)` with RLS: admins read/write all; agents read all, no writes.
+## Backend move: self-hosted Supabase → Lovable Cloud
+Your app currently talks to `supabase.accentrixmailer.online`. To use Lovable Cloud I'll enable it (provisions a fresh Cloud DB), re-run migrations `0001`–`0004`, and swap the client URL/keys. **Existing users, contacts, and call history on the VPS Supabase will not migrate automatically** — if you need them, tell me and I'll add a one-time export/import step before cutover.
 
-**Admin CSV upload** at `/admin/contacts`
-- Upload `.csv` (papaparse), preview first 5 rows, map columns to `phone / first / last / email / notes`, bulk insert in 500-row chunks.
-- List management: create/rename/delete lists, delete rows.
+## Secrets you'll provide
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_API_KEY_SID` + `TWILIO_API_KEY_SECRET` (created in Twilio console → Account → API keys)
+- `TWILIO_TWIML_APP_SID` (created in Console → Voice → TwiML Apps, Voice Request URL = your `/api/public/twilio-voice`)
+- `TWILIO_AUTH_TOKEN` (for validating incoming webhook signatures)
 
-**Agent view** at `/dialer`
-- New left panel above the softphone: list selector + searchable contact table. Clicking a row fills the softphone number and prefills CRM fields (name, email) into the notes form.
-- Small "Recent" tab showing the agent's last 20 dialed customers.
+You'll also buy one Twilio number in the console and paste it into **Admin → Outbound** as before.
 
-## 6. Inbound routing
+## Steps
+1. Enable Lovable Cloud and re-apply migrations `0001`–`0004`.
+2. Install `@twilio/voice-sdk` (browser) and `twilio` (server).
+3. Add Twilio secrets via secure form.
+4. Add `src/lib/voice-client.ts` (Twilio wrapper) and swap `src/lib/softphone.ts` usage in `src/routes/_authenticated/dialer.tsx`.
+5. Add server fns `getVoiceToken`, `logCallStart` in `src/lib/calls.functions.ts` (replace Asterisk ARI code).
+6. Add `src/routes/api/public/twilio-voice.ts`, `twilio-voice-inbound.ts`, `twilio-status.ts` with signature verification.
+7. Verify: buy $1 test number, place a call from `/dialer`, confirm audio both ways and status transitions in `/admin/live` + `/admin/calls`.
+8. Archive Asterisk files (`ami-forwarder/`, `docs/ASTERISK_*.md`) into `docs/archive/` — kept for reference, not deleted.
 
-**Schema**
-- `inbound_routes (id, did text unique, strategy 'direct'|'roundrobin', target_user_id nullable, ring_group jsonb, ring_seconds int default 20)`
-- `inbound_state (did pk, last_agent_index int)` — round-robin cursor.
+## Cost snapshot
+- Twilio number: ~$1.15/month
+- Outbound US calls: ~$0.014/min
+- Inbound to number: ~$0.0085/min
+- Browser client: free
 
-**Admin UI** at `/admin/inbound`
-- Table of DIDs with strategy, agent picker (direct) or multi-select (round-robin), ring timeout.
+## Alternatives if you'd rather not use Twilio
+- **Telnyx WebRTC SDK** — same shape, you already have a Telnyx account and DIDs. Slightly more setup for the credential/connection object but avoids introducing a new vendor. Say the word and I'll target Telnyx instead.
+- **SignalWire** — Twilio-compatible API, cheaper per minute.
 
-**Routing endpoint**
-- New public server route `POST /api/public/inbound-route` (HMAC-signed like the events webhook). Takes `{ did, callId }`, looks up the route, and returns `{ extension }` (direct) or picks the next available agent from `agent_status` (round-robin), advancing `last_agent_index`. Falls back to voicemail extension if none available.
-- Dialplan snippet in `docs/ASTERISK_SETUP.md`: the Telnyx inbound context uses `CURL()` to hit this endpoint, then `Dial(PJSIP/${extension},${ring_seconds})`.
-
-## Technical notes
-
-- All new tables get GRANTs (`authenticated` read, `service_role` all) plus RLS with `has_role('admin')` for writes.
-- Realtime uses the existing self-hosted Supabase — enable replication on `agent_status` and `calls` in a migration.
-- All admin server functions verify `has_role('admin')` before hitting ARI or `supabaseAdmin`.
-- ChanSpy needs a dialplan context; documented in `docs/ASTERISK_SETUP.md`, no code change on the VPS beyond editing `extensions.conf`.
-
-## Delivery order
-
-1. Migration: `agent_status`, `contact_lists`, `contacts`, `inbound_routes`, `inbound_state` + RLS + realtime.
-2. Live monitoring (presence + spy/whisper/barge).
-3. Contacts (admin upload + agent panel).
-4. Inbound routing (admin UI + `/api/public/inbound-route`).
-5. Update `docs/ASTERISK_SETUP.md` with the dialplan snippets.
-
-Shall I proceed?
+Approve and I'll enable Lovable Cloud and start the swap. If you prefer **Telnyx WebRTC** (reusing your existing DIDs and account), tell me and I'll rewrite the plan for that path.
