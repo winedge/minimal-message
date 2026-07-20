@@ -57,13 +57,16 @@ export const Route = createFileRoute("/api/public/asterisk-events")({
           switch (payload.type) {
             case "channel_ringing":
               if (payload.callId)
-                await supabaseAdmin.from("calls").update({ status: "ringing" }).eq("id", payload.callId);
+                await supabaseAdmin
+                  .from("calls")
+                  .update({ status: "ringing", disposition: null })
+                  .eq("id", payload.callId);
               break;
             case "channel_answered":
               if (payload.callId)
                 await supabaseAdmin
                   .from("calls")
-                  .update({ status: "answered", answered_at: now })
+                  .update({ status: "answered", answered_at: now, disposition: null })
                   .eq("id", payload.callId);
               break;
             case "channel_hangup":

@@ -64,15 +64,18 @@ export const originateCall = createServerFn({ method: "POST" })
       : await supabaseAdmin.from("outbound_dids").select("phone_number").eq("is_default", true).maybeSingle();
     if (didQuery.data?.phone_number) callerNumber = didQuery.data.phone_number;
 
-    // Insert call row (dialing). AMI webhook flips to "ringing" on 180/183
-    // from the carrier and "answered" on 200 OK.
+    // Insert a DB-compatible placeholder row. Some installed databases still
+    // have the original call_status enum without "dialing", so keep the enum
+    // value valid and mark the pre-carrier phase in disposition instead. The
+    // AMI webhook clears this marker when Telnyx sends 180/183.
     const { data: call, error: insErr } = await context.supabase
       .from("calls")
       .insert({
         agent_id: context.userId,
         customer_phone: data.customerPhone,
         direction: "outbound",
-        status: "dialing",
+        status: "ringing",
+        disposition: "DIALING",
       })
       .select("id")
       .single();
