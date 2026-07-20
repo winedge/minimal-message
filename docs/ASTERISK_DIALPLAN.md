@@ -111,3 +111,74 @@ asterisk -rvvv
 
 If `CURL()` returns empty, check that the VPS can reach the app URL and
 that `INBOUND_SECRET` matches on both sides.
+
+---
+
+## 3. `[lovable-outbound]` — agent-originated outbound calls (real ringback)
+
+Used by `originateCall` in `src/lib/calls.functions.ts`. ARI originates the
+agent's PJSIP endpoint into this context so the softphone hears **real
+carrier ringback** (Telnyx early media, SIT tones, "number disconnected"
+announcements) instead of just silence.
+
+Add to `/etc/asterisk/extensions.conf`:
+
+```ini
+[lovable-outbound]
+; Called by ARI originate for agent outbound calls.
+; Vars set by originateCall():
+;   CALLERID_NUM    = the outbound DID selected by the agent
+;   CUSTOMER_PHONE  = raw dialed number (for logging)
+;   LOVABLE_CALL_ID = DB row id
+;   LOVABLE_AGENT_ID
+exten => _X.,1,NoOp(Outbound ${EXTEN} caller ${CALLERID_NUM} agent ${LOVABLE_AGENT_ID})
+ same => n,Set(CALLERID(num)=${CALLERID_NUM})
+ same => n,Set(CALLERID(all)=${CALLERID_NUM})
+ same => n,Progress()
+ ; Dial options:
+ ;   r = generate ringback to the caller (agent) until the callee answers,
+ ;       automatically switches to real early media once Telnyx sends 183+SDP.
+ ;   T = allow caller (agent) to transfer with blind-xfer feature.
+ ;   t = allow callee to transfer.
+ ;   b(...) = pre-dial hook we could use later for CDR tagging.
+ same => n,Dial(PJSIP/telnyx/${EXTEN},60,rtT)
+ same => n,NoOp(Dial ended DIALSTATUS=${DIALSTATUS} HANGUPCAUSE=${HANGUPCAUSE})
+ same => n,Hangup()
+```
+
+Reload:
+
+```bash
+asterisk -rx "dialplan reload"
+asterisk -rx "dialplan show lovable-outbound"
+```
+
+### Why not `from-internal`?
+
+`from-internal` typically bridges directly without `Progress()` and without
+the `r` Dial option, so between the moment the softphone auto-answers and
+the moment Telnyx returns 200 OK the agent hears silence. `[lovable-outbound]`
+guarantees continuous ringback → early media → answered audio.
+
+### Verifying a live call end-to-end
+
+On the VPS, in one terminal:
+
+```bash
+asterisk -rvvvvv
+# then inside the CLI:
+pjsip set logger on
+```
+
+Place a call from the softphone. You should see, in order:
+
+1. `Executing [<number>@lovable-outbound:1] NoOp(...)` — ARI hit our context.
+2. `<--- Transmitting SIP request (INVITE) --->` to `sip.telnyx.com`.
+3. `100 Trying`, then `183 Session Progress` or `180 Ringing` from Telnyx.
+4. Real ringback audible in the softphone.
+5. `200 OK` → `DIALSTATUS=ANSWER` → talk path bridged.
+
+Also cross-check in the Telnyx portal → **Reporting → Debugging → SIP Call
+Flow Tool**: filter by your DID / destination and confirm Telnyx received
+your INVITE and what the downstream carrier replied. If Telnyx shows no
+INVITE, the problem is between Asterisk and Telnyx (auth / IP ACL / trunk).
