@@ -102,6 +102,7 @@ function DialerPage() {
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const [dialMessage, setDialMessage] = useState<string | null>(null);
   const [outboundDialing, setOutboundDialing] = useState(false);
+  const [callProgress, setCallProgress] = useState<{ label: string; kind: "dialing" | "ringing" | "answered" | "failed" } | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
   const pendingOutboundRef = useRef(false);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
