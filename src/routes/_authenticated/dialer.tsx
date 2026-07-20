@@ -355,7 +355,8 @@ function DialerPage() {
       if (cancelled || !data) return;
       const s = data.status as string | null;
       const disp = (data.disposition as string | null) ?? null;
-      if (s === "ringing") setCallProgress({ label: "Ringing customer…", kind: "ringing" });
+      if (s === "dialing" || disp === "DIALING") setCallProgress({ label: "Dialing customer…", kind: "dialing" });
+      else if (s === "ringing") setCallProgress({ label: "Ringing customer…", kind: "ringing" });
       else if (s === "answered") setCallProgress({ label: "Customer answered", kind: "answered" });
       else if (s === "ended" || s === "failed") {
         const nice =
