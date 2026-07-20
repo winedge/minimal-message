@@ -102,6 +102,7 @@ function DialerPage() {
   const [wsProbe, setWsProbe] = useState<string | null>(null);
   const [dialMessage, setDialMessage] = useState<string | null>(null);
   const [outboundDialing, setOutboundDialing] = useState(false);
+  const [callProgress, setCallProgress] = useState<{ label: string; kind: "dialing" | "ringing" | "answered" | "failed" } | null>(null);
   const softphoneRef = useRef<Softphone | null>(null);
   const pendingOutboundRef = useRef(false);
   const presenceRef = useRef({ state, activeChannel, activeCallId });
@@ -335,6 +336,51 @@ function DialerPage() {
     else sp.stopRingback();
   }, [outboundDialing, dial.isPending, state, incoming]);
 
+  // Poll the call row so the UI reflects real PBX progress: dialing → ringing
+  // customer → answered → ended (with disposition). Driven by AMI events
+  // written to `calls` via the /api/public/asterisk-events webhook.
+  useEffect(() => {
+    if (!activeCallId || !outboundDialing) {
+      setCallProgress(null);
+      return;
+    }
+    setCallProgress({ label: "Dialing customer…", kind: "dialing" });
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from("calls")
+        .select("status, disposition")
+        .eq("id", activeCallId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const s = data.status as string | null;
+      const disp = (data.disposition as string | null) ?? null;
+      if (s === "ringing") setCallProgress({ label: "Ringing customer…", kind: "ringing" });
+      else if (s === "answered") setCallProgress({ label: "Customer answered", kind: "answered" });
+      else if (s === "ended" || s === "failed") {
+        const nice =
+          disp === "ANSWER" ? "Call ended"
+          : disp === "BUSY" ? "Customer is busy"
+          : disp === "NOANSWER" ? "No answer"
+          : disp === "CONGESTION" ? "Network congestion"
+          : disp === "CHANUNAVAIL" ? "Customer unreachable"
+          : disp ? `Call failed (${disp})` : "Call did not connect";
+        setCallProgress({ label: nice, kind: "failed" });
+        setDialMessage(nice);
+        // Tear down the local softphone leg so the UI resets shortly.
+        softphoneRef.current?.hangup();
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [activeCallId, outboundDialing]);
+
+
+
 
   const handleKey = useCallback((k: string) => {
     if (inCall) softphoneRef.current?.sendDtmf(k);
@@ -451,7 +497,7 @@ function DialerPage() {
               ? "Incoming call"
               : state === "in_call"
                 ? held ? "On hold" : "Connected"
-                : "Calling…";
+                : callProgress?.label ?? "Calling…";
 
             if (callView) {
               return (
@@ -463,9 +509,18 @@ function DialerPage() {
                       {incoming ? (incoming.displayName ?? incoming.from) : phone}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
-                      {state === "in_call" ? fmtDuration(elapsedSec) : incoming ? "Ringing…" : "Dialing…"}
+                      {state === "in_call"
+                        ? fmtDuration(elapsedSec)
+                        : incoming
+                          ? "Ringing…"
+                          : callProgress?.kind === "ringing"
+                            ? "Ringing customer"
+                            : callProgress?.kind === "failed"
+                              ? "Ending…"
+                              : "Dialing…"}
                     </div>
                   </div>
+
 
                   {/* In-call DTMF keypad (toggle) */}
                   {showKeypad && inCall && (
