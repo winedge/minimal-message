@@ -324,13 +324,17 @@ function DialerPage() {
   const inCall = state === "in_call" || !!activeChannel;
 
   // Local ringback tone while we're waiting for the callee to pick up.
+  // Keep playing until the SIP session is fully established (state === "in_call"),
+  // NOT just when the agent leg auto-answers — otherwise there's silence between
+  // agent-leg answer and Telnyx delivering ringback / early media.
   useEffect(() => {
     const sp = softphoneRef.current;
     if (!sp) return;
-    const shouldRing = (outboundDialing || dial.isPending) && !inCall && !incoming;
+    const shouldRing = (outboundDialing || dial.isPending) && state !== "in_call" && !incoming;
     if (shouldRing) sp.startRingback();
     else sp.stopRingback();
-  }, [outboundDialing, dial.isPending, inCall, incoming]);
+  }, [outboundDialing, dial.isPending, state, incoming]);
+
 
   const handleKey = useCallback((k: string) => {
     if (inCall) softphoneRef.current?.sendDtmf(k);
