@@ -497,7 +497,7 @@ function DialerPage() {
               ? "Incoming call"
               : state === "in_call"
                 ? held ? "On hold" : "Connected"
-                : "Calling…";
+                : callProgress?.label ?? "Calling…";
 
             if (callView) {
               return (
@@ -509,9 +509,18 @@ function DialerPage() {
                       {incoming ? (incoming.displayName ?? incoming.from) : phone}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
-                      {state === "in_call" ? fmtDuration(elapsedSec) : incoming ? "Ringing…" : "Dialing…"}
+                      {state === "in_call"
+                        ? fmtDuration(elapsedSec)
+                        : incoming
+                          ? "Ringing…"
+                          : callProgress?.kind === "ringing"
+                            ? "Ringing customer"
+                            : callProgress?.kind === "failed"
+                              ? "Ending…"
+                              : "Dialing…"}
                     </div>
                   </div>
+
 
                   {/* In-call DTMF keypad (toggle) */}
                   {showKeypad && inCall && (
