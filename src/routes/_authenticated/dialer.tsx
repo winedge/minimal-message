@@ -152,12 +152,7 @@ function DialerPage() {
       onHoldChange: setHeld,
     });
     softphoneRef.current = sp;
-    sp.register({
-      username: c.username,
-      password: c.password,
-      wssUrl: c.wssUrl,
-      sipDomain: c.sipDomain,
-    });
+    sp.register({ token: c.token, identity: c.identity });
     sp.listDevices().then(({ inputs, outputs }) => {
       setInputs(inputs);
       setOutputs(outputs);
@@ -256,12 +251,16 @@ function DialerPage() {
 
 
   const dial = useMutation({
-    mutationFn: async () => originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } }),
+    mutationFn: async () => {
+      const r = await originate({ data: { customerPhone: phone, outboundDidId: outboundDidId || null } });
+      await softphoneRef.current?.dialOut({ to: r.to, from: r.from, callId: r.callId });
+      return r;
+    },
     onMutate: () => {
-      pendingOutboundRef.current = true;
+      pendingOutboundRef.current = false; // Twilio outbound doesn't ring the agent leg
       setOutboundDialing(true);
       setIncoming(null);
-      setDialMessage("Sending call to Asterisk…");
+      setDialMessage("Connecting to Twilio…");
       toast.info("Starting call…");
     },
     onSuccess: (r) => {

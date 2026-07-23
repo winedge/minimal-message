@@ -14,6 +14,9 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDialerRouteImport } from './routes/_authenticated/dialer'
+import { Route as ApiPublicTwilioVoiceRouteImport } from './routes/api/public/twilio-voice'
+import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/twilio-status'
+import { Route as ApiPublicTwilioInboundRouteImport } from './routes/api/public/twilio-inbound'
 import { Route as ApiPublicInboundRouteRouteImport } from './routes/api/public/inbound-route'
 import { Route as ApiPublicAsteriskEventsRouteImport } from './routes/api/public/asterisk-events'
 import { Route as AuthenticatedAdminOutboundRouteImport } from './routes/_authenticated/admin/outbound'
@@ -47,6 +50,21 @@ const AuthenticatedDialerRoute = AuthenticatedDialerRouteImport.update({
   id: '/dialer',
   path: '/dialer',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicTwilioVoiceRoute = ApiPublicTwilioVoiceRouteImport.update({
+  id: '/api/public/twilio-voice',
+  path: '/api/public/twilio-voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTwilioStatusRoute = ApiPublicTwilioStatusRouteImport.update({
+  id: '/api/public/twilio-status',
+  path: '/api/public/twilio-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTwilioInboundRoute = ApiPublicTwilioInboundRouteImport.update({
+  id: '/api/public/twilio-inbound',
+  path: '/api/public/twilio-inbound',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicInboundRouteRoute = ApiPublicInboundRouteRouteImport.update({
   id: '/api/public/inbound-route',
@@ -113,6 +131,9 @@ export interface FileRoutesByFullPath {
   '/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
+  '/api/public/twilio-inbound': typeof ApiPublicTwilioInboundRoute
+  '/api/public/twilio-status': typeof ApiPublicTwilioStatusRoute
+  '/api/public/twilio-voice': typeof ApiPublicTwilioVoiceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -128,6 +149,9 @@ export interface FileRoutesByTo {
   '/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
+  '/api/public/twilio-inbound': typeof ApiPublicTwilioInboundRoute
+  '/api/public/twilio-status': typeof ApiPublicTwilioStatusRoute
+  '/api/public/twilio-voice': typeof ApiPublicTwilioVoiceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -145,6 +169,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/outbound': typeof AuthenticatedAdminOutboundRoute
   '/api/public/asterisk-events': typeof ApiPublicAsteriskEventsRoute
   '/api/public/inbound-route': typeof ApiPublicInboundRouteRoute
+  '/api/public/twilio-inbound': typeof ApiPublicTwilioInboundRoute
+  '/api/public/twilio-status': typeof ApiPublicTwilioStatusRoute
+  '/api/public/twilio-voice': typeof ApiPublicTwilioVoiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -162,6 +189,9 @@ export interface FileRouteTypes {
     | '/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
+    | '/api/public/twilio-inbound'
+    | '/api/public/twilio-status'
+    | '/api/public/twilio-voice'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +207,9 @@ export interface FileRouteTypes {
     | '/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
+    | '/api/public/twilio-inbound'
+    | '/api/public/twilio-status'
+    | '/api/public/twilio-voice'
   id:
     | '__root__'
     | '/'
@@ -193,6 +226,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/outbound'
     | '/api/public/asterisk-events'
     | '/api/public/inbound-route'
+    | '/api/public/twilio-inbound'
+    | '/api/public/twilio-status'
+    | '/api/public/twilio-voice'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,6 +237,9 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ApiPublicAsteriskEventsRoute: typeof ApiPublicAsteriskEventsRoute
   ApiPublicInboundRouteRoute: typeof ApiPublicInboundRouteRoute
+  ApiPublicTwilioInboundRoute: typeof ApiPublicTwilioInboundRoute
+  ApiPublicTwilioStatusRoute: typeof ApiPublicTwilioStatusRoute
+  ApiPublicTwilioVoiceRoute: typeof ApiPublicTwilioVoiceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -239,6 +278,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/dialer'
       preLoaderRoute: typeof AuthenticatedDialerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/twilio-voice': {
+      id: '/api/public/twilio-voice'
+      path: '/api/public/twilio-voice'
+      fullPath: '/api/public/twilio-voice'
+      preLoaderRoute: typeof ApiPublicTwilioVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/twilio-status': {
+      id: '/api/public/twilio-status'
+      path: '/api/public/twilio-status'
+      fullPath: '/api/public/twilio-status'
+      preLoaderRoute: typeof ApiPublicTwilioStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/twilio-inbound': {
+      id: '/api/public/twilio-inbound'
+      path: '/api/public/twilio-inbound'
+      fullPath: '/api/public/twilio-inbound'
+      preLoaderRoute: typeof ApiPublicTwilioInboundRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/inbound-route': {
       id: '/api/public/inbound-route'
@@ -339,17 +399,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicAsteriskEventsRoute: ApiPublicAsteriskEventsRoute,
   ApiPublicInboundRouteRoute: ApiPublicInboundRouteRoute,
+  ApiPublicTwilioInboundRoute: ApiPublicTwilioInboundRoute,
+  ApiPublicTwilioStatusRoute: ApiPublicTwilioStatusRoute,
+  ApiPublicTwilioVoiceRoute: ApiPublicTwilioVoiceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
