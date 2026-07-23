@@ -86,6 +86,20 @@ function OutboundPage() {
     onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
 
+  const syncWebhooks = useMutation({
+    mutationFn: async () => syncHooks({ data: {} }),
+    onSuccess: (r: any) => {
+      const failed = r?.failed?.length ?? 0;
+      if (failed > 0) {
+        toast.warning(`Updated ${r.updated} number(s); ${failed} failed`);
+      } else {
+        toast.success(`Synced webhooks on ${r.updated} Twilio number(s)`);
+      }
+      twilio.refetch();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
+  });
+
   if (role !== "admin") return <div>Admin only.</div>;
 
   return (
