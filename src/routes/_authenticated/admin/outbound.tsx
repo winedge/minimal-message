@@ -92,22 +92,53 @@ function OutboundPage() {
       <div>
         <h1 className="text-xl font-semibold">Outbound Caller IDs</h1>
         <p className="text-sm text-muted-foreground">
-          Numbers agents can present as Caller ID on outbound calls. Sourced live from Telnyx.
+          Numbers agents can present as Caller ID on outbound calls. Sync from Twilio or Telnyx.
         </p>
       </div>
 
       <div className="rounded border p-4 space-y-3">
         <h2 className="font-medium">Add DID</h2>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs">Source:</Label>
+          <div className="inline-flex rounded border overflow-hidden">
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs ${source === "twilio" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+              onClick={() => { setSource("twilio"); setSelected(""); }}
+            >
+              Twilio
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs ${source === "telnyx" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+              onClick={() => { setSource("telnyx"); setSelected(""); }}
+            >
+              Telnyx
+            </button>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => providerQuery.refetch()}
+            disabled={providerQuery.isFetching}
+          >
+            {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
+          </Button>
+        </div>
         <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">
           <div>
-            <Label>Telnyx number</Label>
+            <Label>{source === "twilio" ? "Twilio number" : "Telnyx number"}</Label>
             <select
               className="w-full rounded border bg-background px-2 py-2 text-sm"
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
             >
               <option value="">
-                {telnyx.isLoading ? "Loading…" : telnyx.error ? "Telnyx unavailable — type below" : "Choose number"}
+                {providerQuery.isLoading
+                  ? "Loading…"
+                  : providerQuery.error
+                    ? `${source === "twilio" ? "Twilio" : "Telnyx"} unavailable — type below`
+                    : "Choose number"}
               </option>
               {available.map((n: any) => (
                 <option key={n.phone_number} value={n.phone_number}>
