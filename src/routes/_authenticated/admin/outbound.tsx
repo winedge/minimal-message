@@ -139,6 +139,16 @@ function OutboundPage() {
           >
             {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
           </Button>
+          {source === "twilio" && (
+            <Button
+              size="sm"
+              onClick={() => syncWebhooks.mutate()}
+              disabled={syncWebhooks.isPending}
+              title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
+            >
+              {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+            </Button>
+          )}
         </div>
         <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">
           <div>
