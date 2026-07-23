@@ -25,9 +25,11 @@ function OutboundPage() {
   const upsert = useServerFn(upsertOutboundDid);
   const remove = useServerFn(deleteOutboundDid);
   const fetchTelnyx = useServerFn(listTelnyxNumbers);
+  const fetchTwilio = useServerFn(listTwilioNumbers);
 
   const [selected, setSelected] = useState("");
   const [label, setLabel] = useState("");
+  const [source, setSource] = useState<"telnyx" | "twilio">("twilio");
 
   const dids = useQuery({
     queryKey: ["outbound_dids"],
@@ -41,14 +43,23 @@ function OutboundPage() {
   const telnyx = useQuery({
     queryKey: ["telnyx-numbers"],
     queryFn: () => fetchTelnyx(),
-    enabled: role === "admin",
+    enabled: role === "admin" && source === "telnyx",
     retry: false,
   });
 
+  const twilio = useQuery({
+    queryKey: ["twilio-numbers"],
+    queryFn: () => fetchTwilio(),
+    enabled: role === "admin" && source === "twilio",
+    retry: false,
+  });
+
+  const providerQuery = source === "twilio" ? twilio : telnyx;
+
   const available = useMemo(() => {
     const owned = new Set((dids.data ?? []).map((d) => d.phone_number));
-    return (telnyx.data ?? []).filter((n: any) => !owned.has(n.phone_number));
-  }, [telnyx.data, dids.data]);
+    return (providerQuery.data ?? []).filter((n: any) => !owned.has(n.phone_number));
+  }, [providerQuery.data, dids.data]);
 
   const add = useMutation({
     mutationFn: async () =>
