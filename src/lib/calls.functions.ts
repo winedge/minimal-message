@@ -2,34 +2,58 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// Decrypt SIP password and return the agent's own SIP credentials
-// for JsSIP registration in the browser.
+function identityForExt(ext: string | number) {
+  return `ext_${ext}`;
+}
+
+// Issue a short-lived Twilio Voice access token for this agent. The browser
+// registers the Device with it and can receive/place calls.
 export const getSipCredentials = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { decryptSecret } = await import("@/lib/crypto.server");
-
-    const { data, error } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from("sip_endpoints")
-      .select("sip_username, sip_password_encrypted, extension")
+      .select("extension")
       .eq("user_id", context.userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
     if (!data) return { provisioned: false as const };
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const apiKeySid = process.env.TWILIO_API_KEY_SID;
+    const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
+    const appSid = process.env.TWILIO_TWIML_APP_SID;
+    if (!accountSid || !apiKeySid || !apiKeySecret || !appSid) {
+      throw new Error("Twilio is not configured (missing TWILIO_* secrets)");
+    }
+
+    const twilio = (await import("twilio")).default;
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+    const identity = identityForExt(data.extension);
+    const token = new AccessToken(accountSid, apiKeySid, apiKeySecret, {
+      identity,
+      ttl: 3600,
+    });
+    token.addGrant(
+      new VoiceGrant({ outgoingApplicationSid: appSid, incomingAllow: true }),
+    );
 
     return {
       provisioned: true as const,
-      username: data.sip_username,
-      password: decryptSecret(data.sip_password_encrypted),
+      token: token.toJwt(),
+      identity,
       extension: data.extension,
-      wssUrl: process.env.ASTERISK_WSS_URL ?? "",
-      sipDomain: process.env.ASTERISK_SIP_DOMAIN ?? "",
+      // Legacy fields kept for backward compat with existing UI bindings.
+      username: identity,
+      password: "",
+      wssUrl: "twilio-managed",
+      sipDomain: "twilio",
     };
   });
 
-// Originate a call via Asterisk ARI. Leg A rings the agent's webrtc endpoint;
-// once answered, dialplan bridges leg B to the customer via the Telnyx trunk.
+// Insert a `calls` row for this outbound attempt and hand back the caller ID
+// the browser should use when it invokes Twilio Voice's connect().
 export const originateCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -41,38 +65,35 @@ export const originateCall = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const ariUrl = process.env.ASTERISK_ARI_URL;
-    const ariUser = process.env.ASTERISK_ARI_USER;
-    const ariPass = process.env.ASTERISK_ARI_PASSWORD;
-    if (!ariUrl || !ariUser || !ariPass) throw new Error("Asterisk ARI not configured");
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sip } = await supabaseAdmin
-      .from("sip_endpoints")
-      .select("sip_username, extension")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (!sip) throw new Error("SIP endpoint not provisioned for this agent");
+    const dialedNumber = data.customerPhone.replace(/[^0-9+*#]/g, "");
+    if (dialedNumber.replace(/[^0-9]/g, "").length < 3) {
+      throw new Error("Enter a valid phone number");
+    }
 
-    const dialedNumber = data.customerPhone.replace(/[^0-9*#]/g, "");
-    if (dialedNumber.length < 3) throw new Error("Enter a valid phone number");
-
-    // Resolve outbound Caller ID (DID). Preference: explicit id → default → agent extension.
-    let callerNumber = sip.extension;
     const didQuery = data.outboundDidId
-      ? await supabaseAdmin.from("outbound_dids").select("phone_number").eq("id", data.outboundDidId).maybeSingle()
-      : await supabaseAdmin.from("outbound_dids").select("phone_number").eq("is_default", true).maybeSingle();
-    if (didQuery.data?.phone_number) callerNumber = didQuery.data.phone_number;
+      ? await supabaseAdmin
+          .from("outbound_dids")
+          .select("phone_number")
+          .eq("id", data.outboundDidId)
+          .maybeSingle()
+      : await supabaseAdmin
+          .from("outbound_dids")
+          .select("phone_number")
+          .eq("is_default", true)
+          .maybeSingle();
+    const callerNumber = didQuery.data?.phone_number;
+    if (!callerNumber) {
+      throw new Error(
+        "No outbound caller ID configured. Add a DID under Admin → Outbound DIDs and mark one as default.",
+      );
+    }
 
-    // Insert a DB-compatible placeholder row. Some installed databases still
-    // have the original call_status enum without "dialing", so keep the enum
-    // value valid and mark the pre-carrier phase in disposition instead. The
-    // AMI webhook clears this marker when Telnyx sends 180/183.
     const { data: call, error: insErr } = await context.supabase
       .from("calls")
       .insert({
         agent_id: context.userId,
-        customer_phone: data.customerPhone,
+        customer_phone: dialedNumber,
         direction: "outbound",
         status: "ringing",
         disposition: "DIALING",
@@ -81,67 +102,18 @@ export const originateCall = createServerFn({ method: "POST" })
       .single();
     if (insErr) throw new Error(insErr.message);
 
-    const auth = Buffer.from(`${ariUser}:${ariPass}`).toString("base64");
-    const body = {
-      endpoint: `PJSIP/${sip.sip_username}`,
-      extension: dialedNumber,
-      context: "lovable-outbound",
-      priority: 1,
-      callerId: `"Agent" <${callerNumber}>`,
-      timeout: 30,
-      variables: {
-        LOVABLE_CALL_ID: call.id,
-        LOVABLE_AGENT_ID: context.userId,
-        CALLERID_NUM: callerNumber,
-        CUSTOMER_PHONE: data.customerPhone,
-      },
-    };
-    console.log("[originateCall] dialing", {
-      callId: call.id,
-      endpoint: body.endpoint,
-      extension: body.extension,
-      context: body.context,
-      callerNumber,
-    });
-    const res = await fetch(`${ariUrl.replace(/\/$/, "")}/channels`, {
-      method: "POST",
-      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      await context.supabase
-        .from("calls")
-        .update({ status: "failed", ended_at: new Date().toISOString() })
-        .eq("id", call.id);
-      console.error("[originateCall] ARI originate failed", res.status, text.slice(0, 500));
-      throw new Error(`Asterisk originate failed (${res.status}): ${text.slice(0, 300)}`);
-    }
-    const channel = (await res.json()) as { id: string };
-    console.log("[originateCall] ARI accepted", { callId: call.id, channelId: channel.id });
-    await context.supabase
-      .from("calls")
-      .update({ asterisk_channel_id: channel.id })
-      .eq("id", call.id);
-
-    return { callId: call.id, channelId: channel.id };
+    return { callId: call.id, from: callerNumber, to: dialedNumber, channelId: call.id };
   });
 
+// Mark the calls row as ended. Twilio Voice SDK handles the actual leg
+// teardown in the browser.
 export const hangupCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ channelId: z.string().min(1) }).parse(input))
-  .handler(async ({ data }) => {
-    const ariUrl = process.env.ASTERISK_ARI_URL;
-    const ariUser = process.env.ASTERISK_ARI_USER;
-    const ariPass = process.env.ASTERISK_ARI_PASSWORD;
-    if (!ariUrl || !ariUser || !ariPass) throw new Error("Asterisk ARI not configured");
-    const auth = Buffer.from(`${ariUser}:${ariPass}`).toString("base64");
-    const res = await fetch(
-      `${ariUrl.replace(/\/$/, "")}/channels/${encodeURIComponent(data.channelId)}`,
-      { method: "DELETE", headers: { Authorization: `Basic ${auth}` } },
-    );
-    if (!res.ok && res.status !== 404) {
-      throw new Error(`ARI hangup failed: ${res.status}`);
-    }
+  .handler(async ({ data, context }) => {
+    await context.supabase
+      .from("calls")
+      .update({ status: "ended", ended_at: new Date().toISOString() })
+      .eq("id", data.channelId);
     return { ok: true };
   });
