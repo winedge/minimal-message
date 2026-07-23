@@ -26,6 +26,7 @@ function OutboundPage() {
   const remove = useServerFn(deleteOutboundDid);
   const fetchTelnyx = useServerFn(listTelnyxNumbers);
   const fetchTwilio = useServerFn(listTwilioNumbers);
+  const syncHooks = useServerFn(syncTwilioWebhooks);
 
   const [selected, setSelected] = useState("");
   const [label, setLabel] = useState("");
