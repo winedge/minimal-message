@@ -1,4 +1,6 @@
-import JsSIP from "jssip";
+// Twilio Voice SDK wrapper. Keeps the same public API our dialer already uses,
+// so switching from JsSIP/Asterisk to Twilio only needs a token + a TwiML app.
+import { Device, Call } from "@twilio/voice-sdk";
 
 export type SoftphoneState =
   | "idle"
@@ -24,15 +26,12 @@ export interface SoftphoneEvents {
 }
 
 export class Softphone {
-  private ua: JsSIP.UA | null = null;
-  private session: any = null;
-  private audio: HTMLAudioElement | null = null;
-  private ringAudioCtx: AudioContext | null = null;
-  private ringTimer: number | null = null;
+  private device: Device | null = null;
+  private activeCall: Call | null = null;
   private events: SoftphoneEvents;
   private outputDeviceId: string | null = null;
   private inputDeviceId: string | null = null;
-  private registrationTimer: number | null = null;
+  private muted = false;
 
   constructor(events: SoftphoneEvents = {}) {
     this.events = events;
@@ -42,191 +41,136 @@ export class Softphone {
     this.events.onState?.(s);
   }
 
-  private clearRegistrationTimer() {
-    if (this.registrationTimer) {
-      clearTimeout(this.registrationTimer);
-      this.registrationTimer = null;
-    }
-  }
-
-  register(opts: { username: string; password: string; wssUrl: string; sipDomain: string }) {
-    if (!opts.wssUrl || !opts.sipDomain) {
-      this.events.onError?.("Softphone: missing WSS URL / SIP domain");
+  async register(opts: { token: string; identity: string }) {
+    if (!opts.token) {
+      this.events.onError?.("Softphone: missing Twilio access token");
       return;
     }
-    const socket = new JsSIP.WebSocketInterface(opts.wssUrl);
-    this.ua = new JsSIP.UA({
-      sockets: [socket],
-      uri: `sip:${opts.username}@${opts.sipDomain}`,
-      password: opts.password,
-      register: true,
-      session_timers: false,
-    });
-    this.ua.on("registered", () => {
-      this.clearRegistrationTimer();
-      this.setState("registered");
-    });
-    this.ua.on("unregistered", () => {
-      this.clearRegistrationTimer();
-      this.setState("idle");
-    });
-    this.ua.on("registrationFailed", (e: any) => {
-      this.clearRegistrationTimer();
-      this.events.onError?.(`Registration failed: ${e.cause}`);
-      this.setState("failed");
-    });
-    this.ua.on("disconnected", (e: any) => {
-      this.clearRegistrationTimer();
-      const reason = e?.reason || e?.cause || "WebSocket connection failed";
-      const origin = typeof window !== "undefined" ? window.location.origin : "this app origin";
-      this.events.onError?.(
-        `PBX WebSocket failed from ${origin} to ${opts.wssUrl}: ${reason}. If Asterisk already allows this origin, use the published app directly or proxy PBX WSS through standard HTTPS port 443.`,
-      );
-      this.setState("failed");
-    });
-    this.ua.on("newRTCSession", (data: any) => {
-      const session = data.session;
-      if (session.direction === "incoming") {
-        this.handleIncoming(session);
-      }
-    });
     this.setState("registering");
-    this.registrationTimer = window.setTimeout(() => {
-      const origin = typeof window !== "undefined" ? window.location.origin : "this app origin";
-      this.events.onError?.(
-        `Registration timed out from ${origin} to ${opts.wssUrl}. Check Asterisk allowed_origins, then use the published app directly or expose WSS on port 443 if the embedded preview blocks port 8089.`,
-      );
+    try {
+      this.device = new Device(opts.token, {
+        logLevel: "warn",
+        closeProtection: true,
+      });
+      this.device.on("registered", () => this.setState("registered"));
+      this.device.on("unregistered", () => this.setState("idle"));
+      this.device.on("error", (e: any) => {
+        const msg = e?.message ?? String(e);
+        this.events.onError?.(`Twilio device error: ${msg}`);
+        this.setState("failed");
+      });
+      this.device.on("tokenWillExpire", () => {
+        console.warn("[softphone] Twilio access token will expire soon");
+      });
+      this.device.on("incoming", (call: Call) => this.handleIncoming(call));
+      await this.device.register();
+    } catch (e: any) {
+      this.events.onError?.(`Twilio setup failed: ${e?.message ?? e}`);
       this.setState("failed");
-      try { this.ua?.stop(); } catch {}
-    }, 12000);
-    this.ua.start();
-
-    if (typeof document !== "undefined" && !this.audio) {
-      this.audio = document.createElement("audio");
-      this.audio.autoplay = true;
-      document.body.appendChild(this.audio);
     }
   }
 
-  private handleIncoming(session: any) {
-    if (this.session) {
-      try { session.terminate({ status_code: 486 }); } catch {}
+  private handleIncoming(call: Call) {
+    if (this.activeCall) {
+      try { call.reject(); } catch {}
       return;
     }
-    this.session = session;
-    const from = session.remote_identity?.uri?.user ?? "unknown";
-    const displayName = session.remote_identity?.display_name;
-    this.wireSession(session);
-    const action = this.events.onIncoming?.({ from, displayName });
+    this.activeCall = call;
+    const from = (call.parameters as any)?.From ?? "unknown";
+    const action = this.events.onIncoming?.({ from });
+    this.wireCall(call);
     if (action === "auto-answer") {
-      this.answer();
+      try { call.accept({ rtcConstraints: this.audioConstraints() as any }); } catch {}
       return;
     }
-    this.startRinger();
     this.setState("incoming");
-    session.on("failed", () => this.stopRinger());
-    session.on("ended", () => this.stopRinger());
-    session.on("accepted", () => this.stopRinger());
   }
 
   answer() {
-    if (!this.session) return;
-    this.session.answer({
-      mediaConstraints: {
-        audio: this.inputDeviceId ? { deviceId: { exact: this.inputDeviceId } } : true,
-        video: false,
-      },
-      pcConfig: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
-    });
-    this.stopRinger();
+    if (!this.activeCall) return;
+    try { this.activeCall.accept({ rtcConstraints: this.audioConstraints() as any }); } catch {}
   }
 
   reject() {
-    try { this.session?.terminate({ status_code: 486 }); } catch {}
-    this.session = null;
-    this.stopRinger();
+    try { this.activeCall?.reject(); } catch {}
+    this.activeCall = null;
     this.setState("registered");
   }
 
-  call(target: string, sipDomain: string) {
-    if (!this.ua) return;
-    const options = {
-      mediaConstraints: {
-        audio: this.inputDeviceId ? { deviceId: { exact: this.inputDeviceId } } : true,
-        video: false,
-      },
-      pcConfig: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
-    };
-    const uri = `sip:${target}@${sipDomain}`;
-    this.session = this.ua.call(uri, options);
-    this.setState("calling");
-    this.wireSession(this.session);
+  async dialOut(params: { to: string; from: string; callId: string }) {
+    if (!this.device) {
+      this.events.onError?.("Softphone not ready — Twilio device not registered");
+      return;
+    }
+    try {
+      const call = await this.device.connect({
+        params: { To: params.to, From: params.from, CallId: params.callId },
+        rtcConstraints: this.audioConstraints() as any,
+      });
+      this.activeCall = call;
+      this.setState("calling");
+      this.wireCall(call);
+    } catch (e: any) {
+      this.events.onError?.(`Dial failed: ${e?.message ?? e}`);
+      this.setState("registered");
+    }
   }
 
-  private wireSession(session: any) {
-    session.on("accepted", () => this.setState("in_call"));
-    session.on("confirmed", () => this.setState("in_call"));
-    session.on("ended", () => {
-      this.session = null;
-      this.events.onEnded?.();
-      this.setState("registered");
-    });
-    session.on("failed", (e: any) => {
-      this.events.onError?.(`Call failed: ${e.cause}`);
-      this.session = null;
-      this.events.onEnded?.();
-      this.setState("registered");
-    });
-    const attach = (stream: MediaStream) => {
-      if (!this.audio) return;
-      this.audio.srcObject = stream;
-      if (this.outputDeviceId && (this.audio as any).setSinkId) {
-        (this.audio as any).setSinkId(this.outputDeviceId).catch(() => {});
-      }
+  private audioConstraints() {
+    return {
+      audio: this.inputDeviceId ? { deviceId: { exact: this.inputDeviceId } } : true,
+      video: false,
     };
-    session.connection?.addEventListener("addstream", (e: any) => attach(e.stream));
-    session.connection?.addEventListener("track", (e: any) => {
-      if (e.streams?.[0]) attach(e.streams[0]);
+  }
+
+  private wireCall(call: Call) {
+    call.on("accept", () => this.setState("in_call"));
+    call.on("ringing", () => this.setState("calling"));
+    call.on("disconnect", () => this.cleanupCall());
+    call.on("cancel", () => this.cleanupCall());
+    call.on("reject", () => this.cleanupCall());
+    call.on("error", (e: any) => {
+      this.events.onError?.(`Call error: ${e?.message ?? e}`);
+      this.cleanupCall();
     });
+  }
+
+  private cleanupCall() {
+    this.activeCall = null;
+    this.muted = false;
+    this.events.onMuteChange?.(false);
+    this.events.onEnded?.();
+    this.setState("registered");
   }
 
   hangup() {
-    try { this.session?.terminate(); } catch {}
-    this.session = null;
-    this.stopRinger();
+    try { this.activeCall?.disconnect(); } catch {}
+    try { this.device?.disconnectAll(); } catch {}
+    this.activeCall = null;
   }
 
-  // --- Mute ---
   toggleMute(): boolean {
-    if (!this.session) return false;
-    const muted = this.session.isMuted?.().audio;
-    if (muted) this.session.unmute({ audio: true });
-    else this.session.mute({ audio: true });
-    const now = !muted;
-    this.events.onMuteChange?.(now);
-    return now;
+    if (!this.activeCall) return false;
+    this.muted = !this.muted;
+    try { this.activeCall.mute(this.muted); } catch {}
+    this.events.onMuteChange?.(this.muted);
+    return this.muted;
   }
 
-  // --- Hold ---
+  // Twilio Voice SDK has no native hold. We emulate hold as mute; the label
+  // in the UI still reads "Hold/Resume".
   toggleHold(): boolean {
-    if (!this.session) return false;
-    const held = this.session.isOnHold?.().local;
-    if (held) this.session.unhold();
-    else this.session.hold();
-    const now = !held;
+    const now = this.toggleMute();
     this.events.onHoldChange?.(now);
     return now;
   }
 
-  // --- DTMF ---
   sendDtmf(tone: string) {
-    try { this.session?.sendDTMF(tone); } catch {}
+    try { this.activeCall?.sendDigits(tone); } catch {}
   }
 
-  // --- Devices ---
   async listDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return { inputs: [], outputs: [] };
-    // Ensure labels populate
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       s.getTracks().forEach((t) => t.stop());
@@ -240,59 +184,23 @@ export class Softphone {
 
   async setOutputDevice(deviceId: string) {
     this.outputDeviceId = deviceId;
-    if (this.audio && (this.audio as any).setSinkId) {
-      try { await (this.audio as any).setSinkId(deviceId); } catch {}
-    }
+    try { await this.device?.audio?.speakerDevices.set([deviceId]); } catch {}
   }
 
   setInputDevice(deviceId: string) {
     this.inputDeviceId = deviceId;
+    try { this.device?.audio?.setInputDevice(deviceId); } catch {}
   }
 
-  // --- Ringer (WebAudio, no asset) ---
-  private startRinger() {
-    if (typeof window === "undefined") return;
-    try {
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-      this.ringAudioCtx = new Ctx();
-      const play = () => {
-        if (!this.ringAudioCtx) return;
-        const ctx = this.ringAudioCtx;
-        const now = ctx.currentTime;
-        [0, 0.4].forEach((offset) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.frequency.value = 440;
-          gain.gain.setValueAtTime(0.0001, now + offset);
-          gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.25);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(now + offset);
-          osc.stop(now + offset + 0.3);
-        });
-      };
-      play();
-      this.ringTimer = window.setInterval(play, 2000);
-    } catch {}
-  }
-
-  private stopRinger() {
-    if (this.ringTimer) {
-      clearInterval(this.ringTimer);
-      this.ringTimer = null;
-    }
-    try { this.ringAudioCtx?.close(); } catch {}
-    this.ringAudioCtx = null;
-  }
-
-  // --- Ringback tone (played locally while waiting for the callee to answer) ---
+  // Local ringback while waiting for the callee. Twilio plays remote early
+  // media once the carrier signals, but the gap between device.connect and
+  // that first SIP progress packet is silent — fill it with a US ringback.
   private ringbackCtx: AudioContext | null = null;
   private ringbackTimer: number | null = null;
-  private ringbackNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
+  private ringbackNodes: OscillatorNode[] = [];
 
   startRingback() {
-    if (typeof window === "undefined") return;
-    if (this.ringbackCtx) return;
+    if (typeof window === "undefined" || this.ringbackCtx) return;
     try {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       const ctx: AudioContext = new Ctx();
@@ -300,19 +208,11 @@ export class Softphone {
       const gain = ctx.createGain();
       gain.gain.value = 0;
       gain.connect(ctx.destination);
-      // US ringback: 440Hz + 480Hz, 2s on / 4s off
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      osc1.frequency.value = 440;
-      osc2.frequency.value = 480;
-      osc1.connect(gain);
-      osc2.connect(gain);
-      osc1.start();
-      osc2.start();
-      this.ringbackNodes = [
-        { osc: osc1, gain },
-        { osc: osc2, gain },
-      ];
+      const o1 = ctx.createOscillator(); o1.frequency.value = 440;
+      const o2 = ctx.createOscillator(); o2.frequency.value = 480;
+      o1.connect(gain); o2.connect(gain);
+      o1.start(); o2.start();
+      this.ringbackNodes = [o1, o2];
       const cycle = () => {
         if (!this.ringbackCtx) return;
         const t = this.ringbackCtx.currentTime;
@@ -332,26 +232,23 @@ export class Softphone {
       clearInterval(this.ringbackTimer);
       this.ringbackTimer = null;
     }
-    this.ringbackNodes.forEach(({ osc }) => { try { osc.stop(); } catch {} });
+    this.ringbackNodes.forEach((o) => { try { o.stop(); } catch {} });
     this.ringbackNodes = [];
     try { this.ringbackCtx?.close(); } catch {}
     this.ringbackCtx = null;
   }
 
   stop() {
-    this.clearRegistrationTimer();
     this.stopRingback();
     this.hangup();
-    try { this.ua?.stop(); } catch {}
-    this.ua = null;
-    if (this.audio) {
-      this.audio.remove();
-      this.audio = null;
-    }
+    try { this.device?.destroy(); } catch {}
+    this.device = null;
   }
 }
 
-export function testSoftphoneWebSocket(wssUrl: string): Promise<{
+// Legacy diagnostic kept so the dialer UI compiles. Twilio manages its own
+// WebSocket, so we just report that no manual probe is needed.
+export function testSoftphoneWebSocket(_url: string): Promise<{
   ok: boolean;
   origin: string;
   url: string;
@@ -359,50 +256,10 @@ export function testSoftphoneWebSocket(wssUrl: string): Promise<{
   reason?: string;
   message: string;
 }> {
-  return new Promise((resolve) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
-    if (!wssUrl) {
-      resolve({ ok: false, origin, url: wssUrl, message: "Missing PBX WSS URL" });
-      return;
-    }
-
-    let settled = false;
-    let ws: WebSocket | null = null;
-    const finish = (result: { ok: boolean; code?: number; reason?: string; message: string }) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      resolve({ ...result, origin, url: wssUrl });
-    };
-    const timer = window.setTimeout(() => {
-      try { ws?.close(); } catch {}
-      finish({ ok: false, message: "WebSocket probe timed out" });
-    }, 5000);
-
-    try {
-      ws = new WebSocket(wssUrl, "sip");
-      ws.onopen = () => {
-        try { ws?.close(1000, "probe-complete"); } catch {}
-        finish({ ok: true, message: "PBX WebSocket opened successfully" });
-      };
-      ws.onerror = () => {
-        finish({ ok: false, message: "Browser rejected the PBX WebSocket before SIP registration" });
-      };
-      ws.onclose = (event) => {
-        if (!settled) {
-          finish({
-            ok: false,
-            code: event.code,
-            reason: event.reason,
-            message: "PBX WebSocket closed before opening",
-          });
-        }
-      };
-    } catch (error) {
-      finish({
-        ok: false,
-        message: error instanceof Error ? error.message : "Failed to create WebSocket",
-      });
-    }
+  return Promise.resolve({
+    ok: true,
+    origin: typeof window !== "undefined" ? window.location.origin : "unknown",
+    url: "twilio-managed",
+    message: "Twilio Voice SDK manages its own WebSocket — no manual probe needed.",
   });
 }
