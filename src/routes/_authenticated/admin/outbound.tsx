@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listTelnyxNumbers } from "@/lib/telnyx.functions";
-import { listTwilioNumbers } from "@/lib/twilio.functions";
+import { listTwilioNumbers, syncTwilioWebhooks } from "@/lib/twilio.functions";
 import { upsertOutboundDid, deleteOutboundDid } from "@/lib/outbound.functions";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ function OutboundPage() {
   const remove = useServerFn(deleteOutboundDid);
   const fetchTelnyx = useServerFn(listTelnyxNumbers);
   const fetchTwilio = useServerFn(listTwilioNumbers);
+  const syncHooks = useServerFn(syncTwilioWebhooks);
 
   const [selected, setSelected] = useState("");
   const [label, setLabel] = useState("");
@@ -85,6 +86,20 @@ function OutboundPage() {
     onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
 
+  const syncWebhooks = useMutation({
+    mutationFn: async () => syncHooks({ data: {} }),
+    onSuccess: (r: any) => {
+      const failed = r?.failed?.length ?? 0;
+      if (failed > 0) {
+        toast.warning(`Updated ${r.updated} number(s); ${failed} failed`);
+      } else {
+        toast.success(`Synced webhooks on ${r.updated} Twilio number(s)`);
+      }
+      twilio.refetch();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
+  });
+
   if (role !== "admin") return <div>Admin only.</div>;
 
   return (
@@ -124,6 +139,16 @@ function OutboundPage() {
           >
             {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
           </Button>
+          {source === "twilio" && (
+            <Button
+              size="sm"
+              onClick={() => syncWebhooks.mutate()}
+              disabled={syncWebhooks.isPending}
+              title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
+            >
+              {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+            </Button>
+          )}
         </div>
         <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">
           <div>
