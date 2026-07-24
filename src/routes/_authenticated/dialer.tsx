@@ -727,7 +727,9 @@ function DialerPage() {
                   <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-6 text-center text-neutral-100">
                     <div className="text-[10px] uppercase tracking-widest text-neutral-400">{callStatusText}</div>
                     <div className="mt-4 text-3xl font-light tracking-wider text-white">
-                      {incoming ? (incoming.displayName ?? incoming.from) : phone}
+                      {incoming
+                        ? (incoming.displayName ?? incoming.from)
+                        : (remoteParty ?? phone)}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
                       {(state === "in_call" || testInCall)
