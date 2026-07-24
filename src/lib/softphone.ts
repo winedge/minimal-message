@@ -293,7 +293,6 @@ export function testSoftphoneWebSocket(_url: string): Promise<{
  * Hold off: mic → customer, music silent.
  * Hold on:  mic muted, music → customer AND agent's local speakers.
  */
-import holdMusicAsset from "@/assets/hold-music.mp3.asset.json";
 
 class HoldMusicProcessor {
   private ctx: AudioContext;
