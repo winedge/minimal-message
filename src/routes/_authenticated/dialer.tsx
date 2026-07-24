@@ -309,6 +309,69 @@ function DialerPage() {
     setIncoming(null);
   }, [stopTestRing]);
 
+  // Local hold music for simulated test calls (no Twilio call to attach processor to).
+  const testHoldRef = useRef<{ stop: () => void } | null>(null);
+  const stopTestHold = useCallback(() => {
+    testHoldRef.current?.stop();
+    testHoldRef.current = null;
+  }, []);
+  const startTestHold = useCallback(() => {
+    stopTestHold();
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const master = ctx.createGain();
+      master.gain.value = 0.25;
+      master.connect(ctx.destination);
+      // Soft C-major pad
+      const chord = [261.63, 329.63, 392.0];
+      const nodes: AudioNode[] = [];
+      chord.forEach((f) => {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = 0.35;
+        o.connect(g).connect(master);
+        o.start();
+        nodes.push(o, g);
+      });
+      // Gentle arpeggio
+      const arp = [523.25, 659.25, 783.99, 659.25];
+      const arpGain = ctx.createGain();
+      arpGain.gain.value = 0;
+      arpGain.connect(master);
+      const arpOsc = ctx.createOscillator();
+      arpOsc.type = "triangle";
+      arpOsc.connect(arpGain);
+      arpOsc.start();
+      nodes.push(arpOsc, arpGain);
+      let step = 0;
+      const tick = () => {
+        const t = ctx.currentTime;
+        arpOsc.frequency.setValueAtTime(arp[step % arp.length], t);
+        arpGain.gain.cancelScheduledValues(t);
+        arpGain.gain.setValueAtTime(0.0001, t);
+        arpGain.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
+        arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+        step++;
+      };
+      tick();
+      const iv = window.setInterval(tick, 650);
+      testHoldRef.current = {
+        stop: () => {
+          clearInterval(iv);
+          nodes.forEach((n) => { try { (n as OscillatorNode).stop?.(); } catch {} try { n.disconnect(); } catch {} });
+          try { ctx.close(); } catch {}
+        },
+      };
+    } catch {}
+  }, [stopTestHold]);
+  useEffect(() => {
+    if (testInCall && held) startTestHold(); else stopTestHold();
+    return () => stopTestHold();
+  }, [testInCall, held, startTestHold, stopTestHold]);
+
   type CallerInfo = {
     id?: string;
     first_name?: string | null;
