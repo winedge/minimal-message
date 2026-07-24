@@ -367,8 +367,10 @@ function DialerPage() {
           : disp ? `Call failed (${disp})` : "Call did not connect";
         setCallProgress({ label: nice, kind: "failed" });
         setDialMessage(nice);
-        // Tear down the local softphone leg so the UI resets shortly.
-        softphoneRef.current?.hangup();
+        // Do NOT force-hangup the softphone here — the Twilio SDK fires its
+        // own `disconnect` event when the media leg actually ends, and that
+        // drives onEnded/cleanup. Hanging up from a poller tick can cut a
+        // live call if a webhook arrives out of order.
       }
     };
     void tick();
