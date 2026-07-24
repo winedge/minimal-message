@@ -102,7 +102,7 @@ function OutboundPage() {
   });
 
   const syncTwiml = useMutation({
-    mutationFn: async () => syncApp({ data: undefined as any }),
+    mutationFn: async () => syncApp(),
     onSuccess: (r: any) =>
       toast.success(`TwiML App "${r.friendly_name ?? r.app_sid}" pointed at ${r.voice_url}`),
     onError: (e: any) => toast.error(e.message ?? "Failed to sync TwiML App"),
