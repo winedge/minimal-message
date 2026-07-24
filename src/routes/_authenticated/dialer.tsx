@@ -93,6 +93,10 @@ function DialerPage() {
   const [muted, setMuted] = useState(false);
   const [held, setHeld] = useState(false);
   const [incoming, setIncoming] = useState<IncomingCallInfo | null>(null);
+  // Number/name of the currently connected remote party. Persists after
+  // an incoming call is answered so the in-call screen keeps showing the
+  // caller instead of falling back to the dialer's current input.
+  const [remoteParty, setRemoteParty] = useState<string | null>(null);
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   const [inputId, setInputId] = useState<string>("");
@@ -131,6 +135,7 @@ function DialerPage() {
           return "auto-answer";
         }
         setIncoming(info);
+        setRemoteParty(info.displayName ?? info.from);
         setOutboundDialing(false);
         toast.info(`Incoming call from ${info.displayName ?? info.from}`);
       },
@@ -140,6 +145,7 @@ function DialerPage() {
         setActiveChannel(null);
         setActiveCallId(null);
         setIncoming(null);
+        setRemoteParty(null);
         setDialMessage(null);
         setShowKeypad(false);
         setCallStartedAt(null);
@@ -414,6 +420,7 @@ function DialerPage() {
       pendingOutboundRef.current = false; // Twilio outbound doesn't ring the agent leg
       setOutboundDialing(true);
       setIncoming(null);
+      setRemoteParty(phone);
       setDialMessage("Connecting to Twilio…");
       toast.info("Starting call…");
     },
@@ -721,7 +728,9 @@ function DialerPage() {
                   <div className="rounded-2xl bg-gradient-to-b from-neutral-800 to-neutral-950 p-6 text-center text-neutral-100">
                     <div className="text-[10px] uppercase tracking-widest text-neutral-400">{callStatusText}</div>
                     <div className="mt-4 text-3xl font-light tracking-wider text-white">
-                      {incoming ? (incoming.displayName ?? incoming.from) : phone}
+                      {incoming
+                        ? (incoming.displayName ?? incoming.from)
+                        : (remoteParty ?? phone)}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
                       {(state === "in_call" || testInCall)

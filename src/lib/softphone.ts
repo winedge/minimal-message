@@ -100,7 +100,14 @@ export class Softphone {
 
   answer() {
     if (!this.activeCall) return;
-    try { this.activeCall.accept({ rtcConstraints: this.audioConstraints() as any }); } catch {}
+    // Resume any suspended AudioContexts on this user gesture so remote
+    // audio can actually play through the browser (Chrome autoplay policy).
+    try { void this.holdProcessor?.resume(); } catch {}
+    // Do NOT pass rtcConstraints here — Twilio already has an input stream
+    // wired through our AudioProcessor. Re-specifying constraints on accept
+    // triggers a mic renegotiation that has been observed to leave the
+    // remote (customer) audio track unattached, causing one-way audio.
+    try { this.activeCall.accept(); } catch {}
   }
 
   reject() {
@@ -350,6 +357,10 @@ class HoldMusicProcessor {
     this.micGain = null;
     this.musicGain = null;
     this.destination = null;
+  }
+
+  async resume() {
+    if (this.ctx.state === "suspended") { try { await this.ctx.resume(); } catch {} }
   }
 
   setHold(hold: boolean) {
