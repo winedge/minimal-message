@@ -767,7 +767,7 @@ function DialerPage() {
         />
       </div>
 
-      <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm lg:order-3">
+      <section className="space-y-4 rounded-2xl border bg-card p-3 shadow-sm sm:p-5 lg:order-3">
         <div className="flex items-center justify-between border-b pb-3">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
