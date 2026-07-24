@@ -749,7 +749,15 @@ function DialerPage() {
                       />
                       <CircleAction
                         active={held}
-                        onClick={() => softphoneRef.current?.toggleHold()}
+                        onClick={() => {
+                          if (testInCall) { setHeld((h) => !h); return; }
+                          const result = softphoneRef.current?.toggleHold();
+                          if (result === false && !held) {
+                            // No active call or processor unavailable — fall back to mute-as-hold
+                            const m = softphoneRef.current?.toggleMute();
+                            if (typeof m === "boolean") setHeld(m);
+                          }
+                        }}
                         icon={held ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
                         label={held ? "Resume" : "Hold"}
                       />
