@@ -287,10 +287,10 @@ function DialerPage() {
   }, [startTestRing]);
   const acceptIncoming = useCallback(() => {
     if (testIncomingRef.current) {
-      testIncomingRef.current = false;
       stopTestRing();
-      setIncoming(null);
-      toast.success("Test call answered — ending preview");
+      setTestInCall(true);
+      setCallStartedAt(Date.now());
+      toast.success("Test call connected");
       return;
     }
     softphoneRef.current?.answer();
@@ -300,6 +300,8 @@ function DialerPage() {
     if (testIncomingRef.current) {
       testIncomingRef.current = false;
       stopTestRing();
+      setTestInCall(false);
+      setCallStartedAt(null);
       setIncoming(null);
       return;
     }
