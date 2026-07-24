@@ -1,0 +1,19 @@
+{
+  "name": "AiDialX Lite",
+  "short_name": "AiDialX",
+  "description": "WebRTC softphone + CRM for outbound dialing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f14",
+  "theme_color": "#22c55e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
