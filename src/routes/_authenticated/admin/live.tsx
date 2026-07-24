@@ -106,14 +106,25 @@ function LivePage() {
     offline: "bg-muted text-muted-foreground",
   };
 
+  // Treat stale heartbeats (>60s) as offline — logout/tab-close doesn't always update state.
+  const STALE_MS = 60_000;
+  const effectiveState = (s: Status): Status["state"] => {
+    const age = now - new Date(s.updated_at).getTime();
+    if (s.state !== "offline" && age > STALE_MS) return "offline";
+    return s.state;
+  };
+
+  const displayed = statuses.map((s) => ({ ...s, state: effectiveState(s) }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-xl font-semibold">Live agent status</h1>
         <p className="text-xs text-muted-foreground">
-          {statuses.filter((s) => s.state !== "offline").length} online · {liveCalls.length} active calls
+          {displayed.filter((s) => s.state !== "offline").length} online · {liveCalls.length} active calls
         </p>
       </div>
+
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {statuses.map((s) => {
