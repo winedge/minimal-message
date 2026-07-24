@@ -321,28 +321,41 @@ function DialerPage() {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AC();
       const master = ctx.createGain();
-      master.gain.value = 0.25;
+      master.gain.value = 0.09;
+      // Warm lowpass so it feels distant and soft
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 900;
+      filter.Q.value = 0.5;
+      filter.connect(master);
       master.connect(ctx.destination);
-      // Soft C-major pad
-      const chord = [261.63, 329.63, 392.0];
+      // Soft low pad: F2/A2/C3 — mellow, non-intrusive
+      const chord = [87.31, 110.0, 130.81];
       const nodes: AudioNode[] = [];
       chord.forEach((f) => {
         const o = ctx.createOscillator();
         o.type = "sine";
         o.frequency.value = f;
         const g = ctx.createGain();
-        g.gain.value = 0.35;
-        o.connect(g).connect(master);
-        o.start();
-        nodes.push(o, g);
+        g.gain.value = 0.22;
+        // Slow vibrato for gentle movement
+        const lfo = ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 0.15;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.6;
+        lfo.connect(lfoGain).connect(o.frequency);
+        o.connect(g).connect(filter);
+        o.start(); lfo.start();
+        nodes.push(o, lfo, g, lfoGain);
       });
-      // Gentle arpeggio
-      const arp = [523.25, 659.25, 783.99, 659.25];
+      // Sparse, slow bell tones — high and quiet, spaced out
+      const arp = [523.25, 659.25, 783.99];
       const arpGain = ctx.createGain();
       arpGain.gain.value = 0;
-      arpGain.connect(master);
+      arpGain.connect(filter);
       const arpOsc = ctx.createOscillator();
-      arpOsc.type = "triangle";
+      arpOsc.type = "sine";
       arpOsc.connect(arpGain);
       arpOsc.start();
       nodes.push(arpOsc, arpGain);
@@ -352,12 +365,12 @@ function DialerPage() {
         arpOsc.frequency.setValueAtTime(arp[step % arp.length], t);
         arpGain.gain.cancelScheduledValues(t);
         arpGain.gain.setValueAtTime(0.0001, t);
-        arpGain.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
-        arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+        arpGain.gain.exponentialRampToValueAtTime(0.06, t + 0.4);
+        arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
         step++;
       };
       tick();
-      const iv = window.setInterval(tick, 650);
+      const iv = window.setInterval(tick, 2400);
       testHoldRef.current = {
         stop: () => {
           clearInterval(iv);
