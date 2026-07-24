@@ -149,7 +149,10 @@ export class Softphone {
   private cleanupCall() {
     this.activeCall = null;
     this.muted = false;
+    this.held = false;
+    this.holdProcessor?.setHold(false);
     this.events.onMuteChange?.(false);
+    this.events.onHoldChange?.(false);
     this.events.onEnded?.();
     this.setState("registered");
   }
@@ -168,12 +171,15 @@ export class Softphone {
     return this.muted;
   }
 
-  // Twilio Voice SDK has no native hold. We emulate hold as mute; the label
-  // in the UI still reads "Hold/Resume".
+  // Real hold: swap mic for synthesized music via Twilio's AudioProcessor.
+  // Customer hears music; agent's mic is silenced upstream. On resume, mic
+  // is restored and music fades out.
   toggleHold(): boolean {
-    const now = this.toggleMute();
-    this.events.onHoldChange?.(now);
-    return now;
+    if (!this.activeCall) return false;
+    this.held = !this.held;
+    this.holdProcessor?.setHold(this.held);
+    this.events.onHoldChange?.(this.held);
+    return this.held;
   }
 
   sendDtmf(tone: string) {
