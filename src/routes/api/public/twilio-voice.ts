@@ -38,9 +38,12 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
 
         // NOTE: no `action` attr — a non-TwiML response there ends the parent
         // leg. Status is tracked via <Number statusCallback> only.
+        // NOTE: no `answerOnBridge` — with a Twilio Voice JS SDK (WebRTC)
+        // parent leg it has been observed to cut the parent Call the moment
+        // the callee answers, so the customer picks up and immediately drops.
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${esc(from)}" answerOnBridge="true" timeout="30">
+  <Dial callerId="${esc(from)}" timeout="30">
     <Number statusCallback="${esc(statusUrl)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${esc(to)}</Number>
   </Dial>
 </Response>`;
