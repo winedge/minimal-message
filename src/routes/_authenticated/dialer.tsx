@@ -135,6 +135,7 @@ function DialerPage() {
           return "auto-answer";
         }
         setIncoming(info);
+        setRemoteParty(info.displayName ?? info.from);
         setOutboundDialing(false);
         toast.info(`Incoming call from ${info.displayName ?? info.from}`);
       },
@@ -144,6 +145,7 @@ function DialerPage() {
         setActiveChannel(null);
         setActiveCallId(null);
         setIncoming(null);
+        setRemoteParty(null);
         setDialMessage(null);
         setShowKeypad(false);
         setCallStartedAt(null);
