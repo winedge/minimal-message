@@ -460,7 +460,7 @@ function DialerPage() {
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
   };
 
-  const inCall = state === "in_call" || !!activeChannel;
+  const inCall = state === "in_call" || !!activeChannel || testInCall;
 
   // Local ringback tone while we're waiting for the callee to pick up.
   // Keep playing until the SIP session is fully established (state === "in_call"),
