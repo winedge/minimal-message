@@ -101,6 +101,13 @@ function OutboundPage() {
     onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
   });
 
+  const syncTwiml = useMutation({
+    mutationFn: async () => syncApp({ data: undefined as any }),
+    onSuccess: (r: any) =>
+      toast.success(`TwiML App "${r.friendly_name ?? r.app_sid}" pointed at ${r.voice_url}`),
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync TwiML App"),
+  });
+
   if (role !== "admin") return <div>Admin only.</div>;
 
   return (
