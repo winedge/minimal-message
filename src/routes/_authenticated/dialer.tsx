@@ -232,14 +232,72 @@ function DialerPage() {
   }, [pushPresence]);
 
 
+  const testIncomingRef = useRef(false);
+  const testRingRef = useRef<{ ctx: AudioContext; stop: () => void } | null>(null);
+  const stopTestRing = useCallback(() => {
+    testRingRef.current?.stop();
+    testRingRef.current = null;
+  }, []);
+  const startTestRing = useCallback(() => {
+    stopTestRing();
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(ctx.destination);
+      const o1 = ctx.createOscillator();
+      const o2 = ctx.createOscillator();
+      o1.frequency.value = 440;
+      o2.frequency.value = 480;
+      o1.connect(gain);
+      o2.connect(gain);
+      o1.start();
+      o2.start();
+      let on = true;
+      const tick = () => {
+        gain.gain.setTargetAtTime(on ? 0.08 : 0, ctx.currentTime, 0.01);
+        on = !on;
+      };
+      tick();
+      const iv = window.setInterval(tick, 1000);
+      testRingRef.current = {
+        ctx,
+        stop: () => {
+          clearInterval(iv);
+          try { o1.stop(); o2.stop(); ctx.close(); } catch {}
+        },
+      };
+    } catch {}
+  }, [stopTestRing]);
+  const simulateIncoming = useCallback(() => {
+    testIncomingRef.current = true;
+    setIncoming({ from: "+15558675309", displayName: "Test Caller" });
+    setOutboundDialing(false);
+    startTestRing();
+    toast.info("Simulated incoming call — this is a UI preview only");
+  }, [startTestRing]);
   const acceptIncoming = useCallback(() => {
+    if (testIncomingRef.current) {
+      testIncomingRef.current = false;
+      stopTestRing();
+      setIncoming(null);
+      toast.success("Test call answered — ending preview");
+      return;
+    }
     softphoneRef.current?.answer();
     setIncoming(null);
-  }, []);
+  }, [stopTestRing]);
   const rejectIncoming = useCallback(() => {
+    if (testIncomingRef.current) {
+      testIncomingRef.current = false;
+      stopTestRing();
+      setIncoming(null);
+      return;
+    }
     softphoneRef.current?.reject();
     setIncoming(null);
-  }, []);
+  }, [stopTestRing]);
 
   const runWsProbe = useCallback(async () => {
     if (!creds.data || creds.data.provisioned === false) return;
