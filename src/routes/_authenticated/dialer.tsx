@@ -306,6 +306,65 @@ function DialerPage() {
     setIncoming(null);
   }, [stopTestRing]);
 
+  type CallerInfo = {
+    id?: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    notes?: string | null;
+    list_name?: string | null;
+    last_called_at?: string | null;
+    matched: boolean;
+  };
+  const [callerInfo, setCallerInfo] = useState<CallerInfo | null>(null);
+  useEffect(() => {
+    if (!incoming) { setCallerInfo(null); return; }
+    if (testIncomingRef.current) {
+      setCallerInfo({
+        first_name: "Test",
+        last_name: "Caller",
+        email: "test.caller@example.com",
+        notes: "Simulated inbound call for UI preview.",
+        list_name: "Preview",
+        matched: true,
+      });
+      return;
+    }
+    let cancelled = false;
+    const digits = (incoming.from || "").replace(/\D/g, "");
+    const last10 = digits.slice(-10);
+    if (!last10) { setCallerInfo({ matched: false }); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("contacts")
+        .select("id, first_name, last_name, email, notes, phone, list_id, contact_lists(name)")
+        .ilike("phone", `%${last10}`)
+        .limit(1);
+      if (cancelled) return;
+      const row = (data ?? [])[0] as any;
+      if (!row) { setCallerInfo({ matched: false }); return; }
+      const { data: lastCall } = await supabase
+        .from("calls")
+        .select("created_at")
+        .eq("customer_phone", row.phone)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      setCallerInfo({
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        email: row.email,
+        notes: row.notes,
+        list_name: row.contact_lists?.name ?? null,
+        last_called_at: (lastCall ?? [])[0]?.created_at ?? null,
+        matched: true,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [incoming]);
+
+
   const runWsProbe = useCallback(async () => {
     if (!creds.data || creds.data.provisioned === false) return;
     setWsProbe("Testing PBX WebSocket…");
@@ -554,6 +613,52 @@ function DialerPage() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_360px_1fr]">
       <section className="mx-auto w-full max-w-[380px] space-y-4 lg:order-2">
 
+        {/* Incoming caller card */}
+        {incoming && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600">Incoming call</p>
+            </div>
+            {callerInfo?.matched ? (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-base font-semibold leading-tight">
+                  {[callerInfo.first_name, callerInfo.last_name].filter(Boolean).join(" ") || "Contact"}
+                </p>
+                <p className="text-xs text-muted-foreground tabular-nums">{incoming.from}</p>
+                {callerInfo.email && (
+                  <p className="text-xs text-muted-foreground truncate">{callerInfo.email}</p>
+                )}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {callerInfo.list_name && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {callerInfo.list_name}
+                    </span>
+                  )}
+                  {callerInfo.last_called_at && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      Last call {new Date(callerInfo.last_called_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                {callerInfo.notes && (
+                  <p className="mt-1 line-clamp-3 rounded-md bg-background/60 p-2 text-xs text-muted-foreground">
+                    {callerInfo.notes}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2">
+                <p className="text-base font-semibold leading-tight">Unknown caller</p>
+                <p className="text-xs text-muted-foreground tabular-nums">{incoming.from}</p>
+                <p className="mt-1 text-xs text-muted-foreground">No matching contact in CRM.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
