@@ -69,25 +69,6 @@ function AuthenticatedShell() {
     </nav>
   );
 
-  const mobileNav = (
-    <>
-      {mainLinks.map((l) => (
-        <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} className={navLinkClass}>
-          {l.label}
-        </Link>
-      ))}
-      {isAdmin && (
-        <>
-          <div className="mt-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin</div>
-          {adminLinks.map((l) => (
-            <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} className={navLinkClass}>
-              {l.label}
-            </Link>
-          ))}
-        </>
-      )}
-    </>
-  );
 
   const initials = (session.email ?? "?").slice(0, 2).toUpperCase();
 
