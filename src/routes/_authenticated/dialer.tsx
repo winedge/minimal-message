@@ -420,6 +420,7 @@ function DialerPage() {
       pendingOutboundRef.current = false; // Twilio outbound doesn't ring the agent leg
       setOutboundDialing(true);
       setIncoming(null);
+      setRemoteParty(phone);
       setDialMessage("Connecting to Twilio…");
       toast.info("Starting call…");
     },
