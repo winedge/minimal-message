@@ -807,9 +807,14 @@ function DialerPage() {
                 ))}
               </select>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={runWsProbe}>
-              Test PBX WebSocket
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={runWsProbe}>
+                Test PBX WebSocket
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={simulateIncoming} disabled={!!incoming || !!activeChannel}>
+                Simulate inbound call
+              </Button>
+            </div>
             {wsProbe && <p className="break-words text-xs text-muted-foreground">{wsProbe}</p>}
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
