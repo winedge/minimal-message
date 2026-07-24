@@ -359,6 +359,10 @@ class HoldMusicProcessor {
     this.destination = null;
   }
 
+  async resume() {
+    if (this.ctx.state === "suspended") { try { await this.ctx.resume(); } catch {} }
+  }
+
   setHold(hold: boolean) {
     if (!this.micGain || !this.musicGain) return;
     const t = this.ctx.currentTime;
