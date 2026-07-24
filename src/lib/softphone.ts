@@ -340,58 +340,58 @@ class HoldMusicProcessor {
     this.micGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.cancelScheduledValues(t);
     this.micGain.gain.setTargetAtTime(hold ? 0 : 1, t, 0.03);
-    this.musicGain.gain.setTargetAtTime(hold ? 0.18 : 0, t, 0.15);
+    this.musicGain.gain.setTargetAtTime(hold ? 0.6 : 0, t, 0.15);
+  }
+
+  private playPianoNote(freq: number, when: number, velocity = 0.45) {
+    if (!this.musicGain) return;
+    const harmonics = [
+      { mult: 1, amp: 1.0, decay: 2.4 },
+      { mult: 2, amp: 0.45, decay: 1.6 },
+      { mult: 3, amp: 0.22, decay: 1.0 },
+      { mult: 4, amp: 0.12, decay: 0.7 },
+    ];
+    const noteGain = this.ctx.createGain();
+    noteGain.gain.setValueAtTime(0.0001, when);
+    noteGain.gain.exponentialRampToValueAtTime(velocity, when + 0.008);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, when + 2.6);
+    noteGain.connect(this.musicGain);
+    harmonics.forEach((h) => {
+      const o = this.ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = freq * h.mult;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(h.amp, when);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + h.decay);
+      o.connect(g).connect(noteGain);
+      o.start(when);
+      o.stop(when + 2.8);
+      this.musicNodes.push(o, g);
+    });
+    this.musicNodes.push(noteGain);
   }
 
   private buildMusic() {
     if (!this.musicGain) return;
-    // Warm lowpass to keep music soft and distant
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 900;
-    filter.Q.value = 0.5;
-    filter.connect(this.musicGain);
-    this.musicNodes.push(filter);
-    // Low, mellow pad: F2/A2/C3 with slow vibrato
-    const chord = [87.31, 110.0, 130.81];
-    chord.forEach((f) => {
-      const o = this.ctx.createOscillator();
-      o.type = "sine";
-      o.frequency.value = f;
-      const g = this.ctx.createGain();
-      g.gain.value = 0.22;
-      o.connect(g).connect(filter);
-      const lfo = this.ctx.createOscillator();
-      lfo.type = "sine";
-      lfo.frequency.value = 0.15;
-      const lfoGain = this.ctx.createGain();
-      lfoGain.gain.value = 0.6;
-      lfo.connect(lfoGain).connect(o.frequency);
-      o.start(); lfo.start();
-      this.musicNodes.push(o, lfo, g, lfoGain);
-    });
-    // Sparse, slow bell tones — quiet and widely spaced
-    const arp = [523.25, 659.25, 783.99];
-    let step = 0;
-    const arpGain = this.ctx.createGain();
-    arpGain.gain.value = 0;
-    arpGain.connect(filter);
-    const arpOsc = this.ctx.createOscillator();
-    arpOsc.type = "sine";
-    arpOsc.connect(arpGain);
-    arpOsc.start();
-    this.musicNodes.push(arpOsc, arpGain);
-    const tick = () => {
-      const t = this.ctx.currentTime;
-      arpOsc.frequency.setValueAtTime(arp[step % arp.length], t);
-      arpGain.gain.cancelScheduledValues(t);
-      arpGain.gain.setValueAtTime(0.0001, t);
-      arpGain.gain.exponentialRampToValueAtTime(0.06, t + 0.4);
-      arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-      step++;
+    // Gentle "Für Elise"-style piano melody in A minor — soothing and recognizable.
+    const melody = [
+      { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
+      { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
+      { f: 659.25, d: 0.35 }, { f: 493.88, d: 0.35 },
+      { f: 587.33, d: 0.35 }, { f: 523.25, d: 0.35 },
+      { f: 440.0, d: 0.9 },
+      { f: 0, d: 0.8 },
+    ];
+    const patternLen = melody.reduce((s, n) => s + n.d, 0);
+    const schedule = (base: number) => {
+      let t = base;
+      melody.forEach((n) => {
+        if (n.f > 0) this.playPianoNote(n.f, t, 0.45);
+        t += n.d;
+      });
     };
-    tick();
-    this.arpTimer = window.setInterval(tick, 2400);
+    schedule(this.ctx.currentTime + 0.1);
+    this.arpTimer = window.setInterval(() => schedule(this.ctx.currentTime + 0.02), patternLen * 1000);
   }
 
   private stopMusic() {
