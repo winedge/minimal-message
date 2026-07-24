@@ -287,19 +287,21 @@ export function testSoftphoneWebSocket(_url: string): Promise<{
 }
 
 /**
- * Twilio AudioProcessor that mixes synthesized hold music with the mic input.
- * When hold is off: mic goes to Twilio, music is silent.
- * When hold is on: mic is muted upstream, music plays to the customer.
- * Uses Web Audio oscillators (no external MP3 asset needed).
+ * Twilio AudioProcessor that mixes hold music (a real piano recording,
+ * Chopin Nocturne Op. 9 No. 2, ~3:23, looped) with the mic input.
+ * Hold off: mic → customer, music silent.
+ * Hold on:  mic muted, music → customer AND agent's local speakers.
  */
+import holdMusicAsset from "@/assets/hold-music.mp3.asset.json";
+
 class HoldMusicProcessor {
   private ctx: AudioContext;
   private destination: MediaStreamAudioDestinationNode | null = null;
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
-  private musicNodes: AudioNode[] = [];
-  private arpTimer: number | null = null;
+  private audioEl: HTMLAudioElement | null = null;
+  private musicSource: MediaElementAudioSourceNode | null = null;
 
   constructor() {
     const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -315,19 +317,35 @@ class HoldMusicProcessor {
     this.micGain.gain.value = 1;
     this.musicGain.gain.value = 0;
     this.micSource.connect(this.micGain).connect(this.destination);
-    this.buildMusic();
+
+    // Real recorded piano piece, looped.
+    this.audioEl = new Audio(holdMusicAsset.url);
+    this.audioEl.loop = true;
+    this.audioEl.crossOrigin = "anonymous";
+    this.audioEl.preload = "auto";
+    try {
+      this.musicSource = this.ctx.createMediaElementSource(this.audioEl);
+      this.musicSource.connect(this.musicGain);
+    } catch (e) {
+      console.warn("[hold-music] source init failed", e);
+    }
     this.musicGain.connect(this.destination);
     // Also route music to agent's speakers so they hear what the customer hears.
     try { this.musicGain.connect(this.ctx.destination); } catch {}
+    // Pre-start playback (muted via gain=0) so hold engages instantly.
+    try { await this.audioEl.play(); } catch {}
     return this.destination.stream;
   }
 
   async destroyProcessedStream(_processed: MediaStream): Promise<void> {
-    this.stopMusic();
+    try { this.audioEl?.pause(); } catch {}
+    try { this.musicSource?.disconnect(); } catch {}
     try { this.micSource?.disconnect(); } catch {}
     try { this.micGain?.disconnect(); } catch {}
     try { this.musicGain?.disconnect(); } catch {}
     try { this.destination?.disconnect(); } catch {}
+    this.audioEl = null;
+    this.musicSource = null;
     this.micSource = null;
     this.micGain = null;
     this.musicGain = null;
@@ -340,63 +358,10 @@ class HoldMusicProcessor {
     this.micGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.cancelScheduledValues(t);
     this.micGain.gain.setTargetAtTime(hold ? 0 : 1, t, 0.03);
-    this.musicGain.gain.setTargetAtTime(hold ? 0.6 : 0, t, 0.15);
-  }
-
-  private playPianoNote(freq: number, when: number, velocity = 0.45) {
-    if (!this.musicGain) return;
-    const harmonics = [
-      { mult: 1, amp: 1.0, decay: 2.4 },
-      { mult: 2, amp: 0.45, decay: 1.6 },
-      { mult: 3, amp: 0.22, decay: 1.0 },
-      { mult: 4, amp: 0.12, decay: 0.7 },
-    ];
-    const noteGain = this.ctx.createGain();
-    noteGain.gain.setValueAtTime(0.0001, when);
-    noteGain.gain.exponentialRampToValueAtTime(velocity, when + 0.008);
-    noteGain.gain.exponentialRampToValueAtTime(0.0001, when + 2.6);
-    noteGain.connect(this.musicGain);
-    harmonics.forEach((h) => {
-      const o = this.ctx.createOscillator();
-      o.type = "sine";
-      o.frequency.value = freq * h.mult;
-      const g = this.ctx.createGain();
-      g.gain.setValueAtTime(h.amp, when);
-      g.gain.exponentialRampToValueAtTime(0.0001, when + h.decay);
-      o.connect(g).connect(noteGain);
-      o.start(when);
-      o.stop(when + 2.8);
-      this.musicNodes.push(o, g);
-    });
-    this.musicNodes.push(noteGain);
-  }
-
-  private buildMusic() {
-    if (!this.musicGain) return;
-    // Gentle "Für Elise"-style piano melody in A minor — soothing and recognizable.
-    const melody = [
-      { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
-      { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
-      { f: 659.25, d: 0.35 }, { f: 493.88, d: 0.35 },
-      { f: 587.33, d: 0.35 }, { f: 523.25, d: 0.35 },
-      { f: 440.0, d: 0.9 },
-      { f: 0, d: 0.8 },
-    ];
-    const patternLen = melody.reduce((s, n) => s + n.d, 0);
-    const schedule = (base: number) => {
-      let t = base;
-      melody.forEach((n) => {
-        if (n.f > 0) this.playPianoNote(n.f, t, 0.45);
-        t += n.d;
-      });
-    };
-    schedule(this.ctx.currentTime + 0.1);
-    this.arpTimer = window.setInterval(() => schedule(this.ctx.currentTime + 0.02), patternLen * 1000);
-  }
-
-  private stopMusic() {
-    if (this.arpTimer) { clearInterval(this.arpTimer); this.arpTimer = null; }
-    this.musicNodes.forEach((n) => { try { (n as OscillatorNode).stop?.(); } catch {} try { n.disconnect(); } catch {} });
-    this.musicNodes = [];
+    this.musicGain.gain.setTargetAtTime(hold ? 0.7 : 0, t, 0.15);
+    if (hold && this.audioEl) {
+      try { void this.audioEl.play(); } catch {}
+    }
   }
 }
+
