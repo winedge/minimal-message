@@ -99,6 +99,8 @@ function LivePage() {
       : calls[0];
   };
 
+  const hasFreshCall = (s: Status) => Boolean(callFor(s));
+
   const fmtDuration = (startIso: string) => {
     const s = Math.max(0, Math.floor((now - new Date(startIso).getTime()) / 1000));
     const m = Math.floor(s / 60);
@@ -123,6 +125,7 @@ function LivePage() {
   const effectiveState = (s: Status): Status["state"] => {
     const age = now - new Date(s.updated_at).getTime();
     if (s.state !== "offline" && age > HEARTBEAT_STALE_MS) return "offline";
+    if (s.state === "on_call" && !hasFreshCall(s)) return "available";
     return s.state;
   };
 
