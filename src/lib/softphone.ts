@@ -66,6 +66,15 @@ export class Softphone {
       });
       this.device.on("incoming", (call: Call) => this.handleIncoming(call));
       await this.device.register();
+      // Attach hold-music audio processor. Twilio invokes createProcessedStream
+      // once the input stream is available; our processor mixes synthesized
+      // music alongside the mic and swaps gains when hold toggles.
+      try {
+        this.holdProcessor = new HoldMusicProcessor();
+        await this.device.audio?.addProcessor(this.holdProcessor as any);
+      } catch (e) {
+        console.warn("[softphone] hold processor unavailable", e);
+      }
     } catch (e: any) {
       this.events.onError?.(`Twilio setup failed: ${e?.message ?? e}`);
       this.setState("failed");
