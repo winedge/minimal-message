@@ -233,6 +233,7 @@ function DialerPage() {
 
 
   const testIncomingRef = useRef(false);
+  const [testInCall, setTestInCall] = useState(false);
   const testRingRef = useRef<{ ctx: AudioContext; stop: () => void } | null>(null);
   const stopTestRing = useCallback(() => {
     testRingRef.current?.stop();
@@ -286,10 +287,10 @@ function DialerPage() {
   }, [startTestRing]);
   const acceptIncoming = useCallback(() => {
     if (testIncomingRef.current) {
-      testIncomingRef.current = false;
       stopTestRing();
-      setIncoming(null);
-      toast.success("Test call answered — ending preview");
+      setTestInCall(true);
+      setCallStartedAt(Date.now());
+      toast.success("Test call connected");
       return;
     }
     softphoneRef.current?.answer();
@@ -299,6 +300,8 @@ function DialerPage() {
     if (testIncomingRef.current) {
       testIncomingRef.current = false;
       stopTestRing();
+      setTestInCall(false);
+      setCallStartedAt(null);
       setIncoming(null);
       return;
     }
@@ -405,6 +408,18 @@ function DialerPage() {
   });
 
   async function endCall() {
+    if (testIncomingRef.current || testInCall) {
+      testIncomingRef.current = false;
+      stopTestRing();
+      setTestInCall(false);
+      setIncoming(null);
+      setCallStartedAt(null);
+      setShowKeypad(false);
+      setMuted(false);
+      setHeld(false);
+      toast.info("Test call ended");
+      return;
+    }
     pendingOutboundRef.current = false;
     setOutboundDialing(false);
     if (activeChannel) await hangup({ data: { channelId: activeChannel } });
@@ -445,7 +460,7 @@ function DialerPage() {
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
   };
 
-  const inCall = state === "in_call" || !!activeChannel;
+  const inCall = state === "in_call" || !!activeChannel || testInCall;
 
   // Local ringback tone while we're waiting for the callee to pick up.
   // Keep playing until the SIP session is fully established (state === "in_call"),
@@ -666,9 +681,9 @@ function DialerPage() {
             const callView = incoming || inCall || state === "calling" || dial.isPending || outboundDialing;
             const elapsedSec = callStartedAt ? Math.floor((Date.now() - callStartedAt) / 1000) : 0;
             void nowTick;
-            const callStatusText = incoming
+            const callStatusText = incoming && !testInCall
               ? "Incoming call"
-              : state === "in_call"
+              : (state === "in_call" || testInCall)
                 ? held ? "On hold" : "Connected"
                 : callProgress?.label ?? "Calling…";
 
@@ -682,7 +697,7 @@ function DialerPage() {
                       {incoming ? (incoming.displayName ?? incoming.from) : phone}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
-                      {state === "in_call"
+                      {(state === "in_call" || testInCall)
                         ? fmtDuration(elapsedSec)
                         : incoming
                           ? "Ringing…"
@@ -743,7 +758,7 @@ function DialerPage() {
 
                   {/* Bottom action */}
                   <div className="mt-6 flex items-center justify-center gap-6">
-                    {incoming ? (
+                    {incoming && !testInCall ? (
                       <>
                         <button
                           onClick={rejectIncoming}
