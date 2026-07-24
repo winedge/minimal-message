@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listTelnyxNumbers } from "@/lib/telnyx.functions";
-import { listTwilioNumbers, syncTwilioWebhooks } from "@/lib/twilio.functions";
+import { listTwilioNumbers, syncTwilioWebhooks, syncTwilioTwimlApp } from "@/lib/twilio.functions";
 import { upsertOutboundDid, deleteOutboundDid } from "@/lib/outbound.functions";
 import { toast } from "sonner";
 
