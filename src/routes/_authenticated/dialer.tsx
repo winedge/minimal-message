@@ -306,6 +306,65 @@ function DialerPage() {
     setIncoming(null);
   }, [stopTestRing]);
 
+  type CallerInfo = {
+    id?: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    notes?: string | null;
+    list_name?: string | null;
+    last_called_at?: string | null;
+    matched: boolean;
+  };
+  const [callerInfo, setCallerInfo] = useState<CallerInfo | null>(null);
+  useEffect(() => {
+    if (!incoming) { setCallerInfo(null); return; }
+    if (testIncomingRef.current) {
+      setCallerInfo({
+        first_name: "Test",
+        last_name: "Caller",
+        email: "test.caller@example.com",
+        notes: "Simulated inbound call for UI preview.",
+        list_name: "Preview",
+        matched: true,
+      });
+      return;
+    }
+    let cancelled = false;
+    const digits = (incoming.from || "").replace(/\D/g, "");
+    const last10 = digits.slice(-10);
+    if (!last10) { setCallerInfo({ matched: false }); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("contacts")
+        .select("id, first_name, last_name, email, notes, phone, list_id, contact_lists(name)")
+        .ilike("phone", `%${last10}`)
+        .limit(1);
+      if (cancelled) return;
+      const row = (data ?? [])[0] as any;
+      if (!row) { setCallerInfo({ matched: false }); return; }
+      const { data: lastCall } = await supabase
+        .from("calls")
+        .select("created_at")
+        .eq("customer_phone", row.phone)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      setCallerInfo({
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        email: row.email,
+        notes: row.notes,
+        list_name: row.contact_lists?.name ?? null,
+        last_called_at: (lastCall ?? [])[0]?.created_at ?? null,
+        matched: true,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [incoming]);
+
+
   const runWsProbe = useCallback(async () => {
     if (!creds.data || creds.data.provisioned === false) return;
     setWsProbe("Testing PBX WebSocket…");
