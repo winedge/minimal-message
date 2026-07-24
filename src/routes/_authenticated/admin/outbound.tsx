@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listTelnyxNumbers } from "@/lib/telnyx.functions";
-import { listTwilioNumbers, syncTwilioWebhooks } from "@/lib/twilio.functions";
+import { listTwilioNumbers, syncTwilioWebhooks, syncTwilioTwimlApp } from "@/lib/twilio.functions";
 import { upsertOutboundDid, deleteOutboundDid } from "@/lib/outbound.functions";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ function OutboundPage() {
   const fetchTelnyx = useServerFn(listTelnyxNumbers);
   const fetchTwilio = useServerFn(listTwilioNumbers);
   const syncHooks = useServerFn(syncTwilioWebhooks);
+  const syncApp = useServerFn(syncTwilioTwimlApp);
 
   const [selected, setSelected] = useState("");
   const [label, setLabel] = useState("");
@@ -100,6 +101,13 @@ function OutboundPage() {
     onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
   });
 
+  const syncTwiml = useMutation({
+    mutationFn: async () => syncApp(),
+    onSuccess: (r: any) =>
+      toast.success(`TwiML App "${r.friendly_name ?? r.app_sid}" pointed at ${r.voice_url}`),
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync TwiML App"),
+  });
+
   if (role !== "admin") return <div>Admin only.</div>;
 
   return (
@@ -140,14 +148,25 @@ function OutboundPage() {
             {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
           </Button>
           {source === "twilio" && (
-            <Button
-              size="sm"
-              onClick={() => syncWebhooks.mutate()}
-              disabled={syncWebhooks.isPending}
-              title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
-            >
-              {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                onClick={() => syncWebhooks.mutate()}
+                disabled={syncWebhooks.isPending}
+                title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
+              >
+                {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => syncTwiml.mutate()}
+                disabled={syncTwiml.isPending}
+                title="Point the TwiML App (used by agent softphones for outbound) at this app's /twilio-voice endpoint"
+              >
+                {syncTwiml.isPending ? "Configuring…" : "Sync TwiML App"}
+              </Button>
+            </>
           )}
         </div>
         <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">

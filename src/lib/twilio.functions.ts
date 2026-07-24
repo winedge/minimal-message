@@ -119,3 +119,46 @@ export const syncTwilioWebhooks = createServerFn({ method: "POST" })
       results,
     };
   });
+
+export const syncTwilioTwimlApp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { sid, header } = twilioAuth();
+
+    const appSid = process.env.TWILIO_TWIML_APP_SID;
+    if (!appSid) throw new Error("TWILIO_TWIML_APP_SID not configured");
+
+    const base = (process.env.PUBLIC_WEBHOOK_BASE_URL ?? "").replace(/\/$/, "");
+    if (!base) throw new Error("PUBLIC_WEBHOOK_BASE_URL not configured");
+
+    const voiceUrl = `${base}/api/public/twilio-voice`;
+    const statusUrl = `${base}/api/public/twilio-status`;
+
+    const body = new URLSearchParams({
+      VoiceUrl: voiceUrl,
+      VoiceMethod: "POST",
+      StatusCallback: statusUrl,
+      StatusCallbackMethod: "POST",
+    });
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Applications/${appSid}.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: header,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body,
+      },
+    );
+    if (!res.ok) throw new Error(`Twilio API ${res.status}: ${await res.text()}`);
+    const json: any = await res.json();
+    return {
+      app_sid: appSid,
+      friendly_name: json.friendly_name ?? null,
+      voice_url: json.voice_url ?? voiceUrl,
+      status_callback: json.status_callback ?? statusUrl,
+    };
+  });
