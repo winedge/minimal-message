@@ -408,6 +408,18 @@ function DialerPage() {
   });
 
   async function endCall() {
+    if (testIncomingRef.current || testInCall) {
+      testIncomingRef.current = false;
+      stopTestRing();
+      setTestInCall(false);
+      setIncoming(null);
+      setCallStartedAt(null);
+      setShowKeypad(false);
+      setMuted(false);
+      setHeld(false);
+      toast.info("Test call ended");
+      return;
+    }
     pendingOutboundRef.current = false;
     setOutboundDialing(false);
     if (activeChannel) await hangup({ data: { channelId: activeChannel } });
