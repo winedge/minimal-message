@@ -752,10 +752,9 @@ function DialerPage() {
                         onClick={() => {
                           if (testInCall) { setHeld((h) => !h); return; }
                           const result = softphoneRef.current?.toggleHold();
-                          if (result === false && !held) {
-                            // No active call or processor unavailable — fall back to mute-as-hold
-                            const m = softphoneRef.current?.toggleMute();
-                            if (typeof m === "boolean") setHeld(m);
+                          if (result === null) {
+                            // No active call — fall back to UI-only toggle
+                            setHeld((h) => !h);
                           }
                         }}
                         icon={held ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
