@@ -681,9 +681,9 @@ function DialerPage() {
             const callView = incoming || inCall || state === "calling" || dial.isPending || outboundDialing;
             const elapsedSec = callStartedAt ? Math.floor((Date.now() - callStartedAt) / 1000) : 0;
             void nowTick;
-            const callStatusText = incoming
+            const callStatusText = incoming && !testInCall
               ? "Incoming call"
-              : state === "in_call"
+              : (state === "in_call" || testInCall)
                 ? held ? "On hold" : "Connected"
                 : callProgress?.label ?? "Calling…";
 
@@ -697,7 +697,7 @@ function DialerPage() {
                       {incoming ? (incoming.displayName ?? incoming.from) : phone}
                     </div>
                     <div className="mt-2 h-5 text-sm tabular-nums text-neutral-400">
-                      {state === "in_call"
+                      {(state === "in_call" || testInCall)
                         ? fmtDuration(elapsedSec)
                         : incoming
                           ? "Ringing…"
