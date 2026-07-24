@@ -25,6 +25,9 @@ type Call = {
   status: string;
 };
 
+const HEARTBEAT_STALE_MS = 60_000;
+const RINGING_STALE_MS = 2 * 60_000;
+
 export const Route = createFileRoute("/_authenticated/admin/live")({
   head: () => ({ meta: [{ title: "Admin — Live" }] }),
   component: LivePage,
@@ -83,7 +86,20 @@ function LivePage() {
   const nameOf = (id: string) =>
     profiles.find((p) => p.id === id)?.full_name || id.slice(0, 8);
   const extOf = (id: string) => sips.find((s) => s.user_id === id)?.extension ?? "—";
-  const callFor = (uid: string) => liveCalls.find((c) => c.agent_id === uid) ?? null;
+  const isFreshLiveCall = (call: Call) => {
+    if (call.status === "answered") return true;
+    return now - new Date(call.started_at).getTime() <= RINGING_STALE_MS;
+  };
+  const callFor = (s: Status) => {
+    if (s.state !== "on_call") return null;
+    const calls = liveCalls.filter((c) => c.agent_id === s.user_id && isFreshLiveCall(c));
+    if (!calls.length) return null;
+    return s.current_call_id
+      ? calls.find((c) => c.id === s.current_call_id) ?? null
+      : calls[0];
+  };
+
+  const hasFreshCall = (s: Status) => Boolean(callFor(s));
 
   const fmtDuration = (startIso: string) => {
     const s = Math.max(0, Math.floor((now - new Date(startIso).getTime()) / 1000));
@@ -106,29 +122,31 @@ function LivePage() {
     offline: "bg-muted text-muted-foreground",
   };
 
-  // Treat stale heartbeats (>60s) as offline — logout/tab-close doesn't always update state.
-  const STALE_MS = 60_000;
   const effectiveState = (s: Status): Status["state"] => {
     const age = now - new Date(s.updated_at).getTime();
-    if (s.state !== "offline" && age > STALE_MS) return "offline";
+    if (s.state !== "offline" && age > HEARTBEAT_STALE_MS) return "offline";
+    if (s.state === "on_call" && !hasFreshCall(s)) return "available";
     return s.state;
   };
 
   const displayed = statuses.map((s) => ({ ...s, state: effectiveState(s) }));
+  const visibleLiveCalls = displayed
+    .map((s) => callFor(s))
+    .filter((call): call is Call => Boolean(call));
 
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-xl font-semibold">Live agent status</h1>
         <p className="text-xs text-muted-foreground">
-          {displayed.filter((s) => s.state !== "offline").length} online · {liveCalls.length} active calls
+          {displayed.filter((s) => s.state !== "offline").length} online · {visibleLiveCalls.length} active calls
         </p>
       </div>
 
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {displayed.map((s) => {
-          const call = callFor(s.user_id);
+          const call = callFor(s);
           const onCall = s.state === "on_call" && !!call;
           return (
             <div key={s.user_id} className="rounded-lg border p-4">
