@@ -243,29 +243,36 @@ function DialerPage() {
     try {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AC();
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      gain.connect(ctx.destination);
-      const o1 = ctx.createOscillator();
-      const o2 = ctx.createOscillator();
-      o1.frequency.value = 440;
-      o2.frequency.value = 480;
-      o1.connect(gain);
-      o2.connect(gain);
-      o1.start();
-      o2.start();
-      let on = true;
-      const tick = () => {
-        gain.gain.setTargetAtTime(on ? 0.08 : 0, ctx.currentTime, 0.01);
-        on = !on;
+      const master = ctx.createGain();
+      master.gain.value = 0.18;
+      master.connect(ctx.destination);
+      // Pleasant marimba-style arpeggio: E6 G6 B6 E7, then pause, repeat
+      const notes = [1318.5, 1568.0, 1975.5, 2637.0];
+      const noteDur = 0.18;
+      const patternDur = notes.length * noteDur + 1.2; // gap after pattern
+      const playPattern = (startAt: number) => {
+        notes.forEach((freq, i) => {
+          const t = startAt + i * noteDur;
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.value = freq;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.9, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + noteDur);
+          osc.connect(g);
+          g.connect(master);
+          osc.start(t);
+          osc.stop(t + noteDur + 0.02);
+        });
       };
-      tick();
-      const iv = window.setInterval(tick, 1000);
+      playPattern(ctx.currentTime + 0.05);
+      const iv = window.setInterval(() => playPattern(ctx.currentTime + 0.02), patternDur * 1000);
       testRingRef.current = {
         ctx,
         stop: () => {
           clearInterval(iv);
-          try { o1.stop(); o2.stop(); ctx.close(); } catch {}
+          try { ctx.close(); } catch {}
         },
       };
     } catch {}
