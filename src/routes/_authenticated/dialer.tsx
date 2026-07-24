@@ -464,8 +464,8 @@ function DialerPage() {
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <div className="hidden text-xs font-medium uppercase tracking-wider text-muted-foreground sm:block">{greeting}</div>
-            <h1 className="truncate text-lg font-semibold tracking-tight sm:mt-0.5 sm:text-3xl">{agentName}</h1>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground sm:text-xs">{greeting}</div>
+            <h1 className="truncate text-xl font-semibold tracking-tight sm:mt-0.5 sm:text-3xl">Welcome, {agentName}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium sm:px-2.5 sm:text-xs ${online ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-600"}`}>
                 {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
