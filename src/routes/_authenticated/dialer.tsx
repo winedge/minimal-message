@@ -93,6 +93,10 @@ function DialerPage() {
   const [muted, setMuted] = useState(false);
   const [held, setHeld] = useState(false);
   const [incoming, setIncoming] = useState<IncomingCallInfo | null>(null);
+  // Number/name of the currently connected remote party. Persists after
+  // an incoming call is answered so the in-call screen keeps showing the
+  // caller instead of falling back to the dialer's current input.
+  const [remoteParty, setRemoteParty] = useState<string | null>(null);
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   const [inputId, setInputId] = useState<string>("");
