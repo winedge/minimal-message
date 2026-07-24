@@ -36,9 +36,11 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
           console.error("[twilio-voice] failed to link CallSid", e);
         }
 
+        // NOTE: no `action` attr — a non-TwiML response there ends the parent
+        // leg. Status is tracked via <Number statusCallback> only.
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${esc(from)}" answerOnBridge="true" timeout="30" action="${esc(statusUrl)}" method="POST">
+  <Dial callerId="${esc(from)}" answerOnBridge="true" timeout="30">
     <Number statusCallback="${esc(statusUrl)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${esc(to)}</Number>
   </Dial>
 </Response>`;
