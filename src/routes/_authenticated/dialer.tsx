@@ -827,11 +827,11 @@ function StatChip({ icon, label, value, tone = "primary" }: { icon: React.ReactN
     amber: "bg-amber-500/10 text-amber-600",
   };
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border bg-card/80 px-3 py-2 backdrop-blur">
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${toneMap[tone]}`}>{icon}</span>
-      <div className="leading-tight">
-        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className="text-base font-semibold tabular-nums">{value}</div>
+    <div className="flex items-center gap-1.5 rounded-lg border bg-card/80 px-1.5 py-1.5 backdrop-blur sm:gap-2.5 sm:rounded-xl sm:px-3 sm:py-2">
+      <span className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex ${toneMap[tone]}`}>{icon}</span>
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-[9px] font-medium uppercase tracking-wider text-muted-foreground sm:text-[10px]">{label}</div>
+        <div className="truncate text-sm font-semibold tabular-nums sm:text-base">{value}</div>
       </div>
     </div>
   );
