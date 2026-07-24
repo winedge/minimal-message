@@ -340,37 +340,44 @@ class HoldMusicProcessor {
     this.micGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.cancelScheduledValues(t);
     this.micGain.gain.setTargetAtTime(hold ? 0 : 1, t, 0.03);
-    this.musicGain.gain.setTargetAtTime(hold ? 0.2 : 0, t, 0.08);
+    this.musicGain.gain.setTargetAtTime(hold ? 0.18 : 0, t, 0.15);
   }
 
   private buildMusic() {
     if (!this.musicGain) return;
-    // Soft ambient pad: C major triad (C-E-G) with slow vibrato.
-    const chord = [261.63, 329.63, 392.0];
+    // Warm lowpass to keep music soft and distant
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 900;
+    filter.Q.value = 0.5;
+    filter.connect(this.musicGain);
+    this.musicNodes.push(filter);
+    // Low, mellow pad: F2/A2/C3 with slow vibrato
+    const chord = [87.31, 110.0, 130.81];
     chord.forEach((f) => {
       const o = this.ctx.createOscillator();
       o.type = "sine";
       o.frequency.value = f;
       const g = this.ctx.createGain();
-      g.gain.value = 0.35;
-      o.connect(g).connect(this.musicGain!);
+      g.gain.value = 0.22;
+      o.connect(g).connect(filter);
       const lfo = this.ctx.createOscillator();
       lfo.type = "sine";
-      lfo.frequency.value = 0.25;
+      lfo.frequency.value = 0.15;
       const lfoGain = this.ctx.createGain();
-      lfoGain.gain.value = 1.5;
+      lfoGain.gain.value = 0.6;
       lfo.connect(lfoGain).connect(o.frequency);
       o.start(); lfo.start();
       this.musicNodes.push(o, lfo, g, lfoGain);
     });
-    // Gentle arpeggio on top for a hold-music feel.
-    const arp = [523.25, 659.25, 783.99, 659.25];
+    // Sparse, slow bell tones — quiet and widely spaced
+    const arp = [523.25, 659.25, 783.99];
     let step = 0;
     const arpGain = this.ctx.createGain();
     arpGain.gain.value = 0;
-    arpGain.connect(this.musicGain);
+    arpGain.connect(filter);
     const arpOsc = this.ctx.createOscillator();
-    arpOsc.type = "triangle";
+    arpOsc.type = "sine";
     arpOsc.connect(arpGain);
     arpOsc.start();
     this.musicNodes.push(arpOsc, arpGain);
@@ -379,12 +386,12 @@ class HoldMusicProcessor {
       arpOsc.frequency.setValueAtTime(arp[step % arp.length], t);
       arpGain.gain.cancelScheduledValues(t);
       arpGain.gain.setValueAtTime(0.0001, t);
-      arpGain.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
-      arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      arpGain.gain.exponentialRampToValueAtTime(0.06, t + 0.4);
+      arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
       step++;
     };
     tick();
-    this.arpTimer = window.setInterval(tick, 650);
+    this.arpTimer = window.setInterval(tick, 2400);
   }
 
   private stopMusic() {
