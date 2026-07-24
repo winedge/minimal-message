@@ -32,6 +32,8 @@ export class Softphone {
   private outputDeviceId: string | null = null;
   private inputDeviceId: string | null = null;
   private muted = false;
+  private held = false;
+  private holdProcessor: HoldMusicProcessor | null = null;
 
   constructor(events: SoftphoneEvents = {}) {
     this.events = events;
