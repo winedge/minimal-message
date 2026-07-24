@@ -309,75 +309,25 @@ function DialerPage() {
     setIncoming(null);
   }, [stopTestRing]);
 
-  // Local hold music for simulated test calls (no Twilio call to attach processor to).
-  const testHoldRef = useRef<{ stop: () => void } | null>(null);
+  // Local hold music for simulated test calls — plays a famous public-domain
+  // piano piece (Chopin Nocturne Op. 9 No. 2) on loop through local speakers.
+  const testHoldRef = useRef<HTMLAudioElement | null>(null);
   const stopTestHold = useCallback(() => {
-    testHoldRef.current?.stop();
-    testHoldRef.current = null;
+    const a = testHoldRef.current;
+    if (a) {
+      try { a.pause(); a.currentTime = 0; } catch {}
+      testHoldRef.current = null;
+    }
   }, []);
   const startTestHold = useCallback(() => {
     stopTestHold();
     try {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AC();
-      const master = ctx.createGain();
-      master.gain.value = 0.35;
-      master.connect(ctx.destination);
-      const nodes: AudioNode[] = [];
-
-      // Piano-like note via additive synthesis: fundamental + harmonics, fast attack, long decay.
-      const playPiano = (freq: number, when: number, velocity = 0.5) => {
-        const harmonics = [
-          { mult: 1, amp: 1.0, decay: 2.4 },
-          { mult: 2, amp: 0.45, decay: 1.6 },
-          { mult: 3, amp: 0.22, decay: 1.0 },
-          { mult: 4, amp: 0.12, decay: 0.7 },
-        ];
-        const noteGain = ctx.createGain();
-        noteGain.gain.setValueAtTime(0.0001, when);
-        noteGain.gain.exponentialRampToValueAtTime(velocity, when + 0.008);
-        noteGain.gain.exponentialRampToValueAtTime(0.0001, when + 2.6);
-        noteGain.connect(master);
-        harmonics.forEach((h) => {
-          const o = ctx.createOscillator();
-          o.type = "sine";
-          o.frequency.value = freq * h.mult;
-          const g = ctx.createGain();
-          g.gain.setValueAtTime(h.amp, when);
-          g.gain.exponentialRampToValueAtTime(0.0001, when + h.decay);
-          o.connect(g).connect(noteGain);
-          o.start(when);
-          o.stop(when + 2.8);
-        });
-      };
-
-      // Gentle "Für Elise"-style melody in A minor — recognizable, calming piano phrase.
-      // Notes: E5 D#5 E5 D#5 E5 B4 D5 C5 A4
-      const melody = [
-        { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
-        { f: 659.25, d: 0.35 }, { f: 622.25, d: 0.35 },
-        { f: 659.25, d: 0.35 }, { f: 493.88, d: 0.35 },
-        { f: 587.33, d: 0.35 }, { f: 523.25, d: 0.35 },
-        { f: 440.0, d: 0.9 },
-        { f: 0, d: 0.8 }, // rest
-      ];
-      const patternLen = melody.reduce((s, n) => s + n.d, 0);
-      const schedule = (base: number) => {
-        let t = base;
-        melody.forEach((n) => {
-          if (n.f > 0) playPiano(n.f, t, 0.45);
-          t += n.d;
-        });
-      };
-      schedule(ctx.currentTime + 0.1);
-      const iv = window.setInterval(() => schedule(ctx.currentTime + 0.02), patternLen * 1000);
-      testHoldRef.current = {
-        stop: () => {
-          clearInterval(iv);
-          nodes.forEach((n) => { try { (n as OscillatorNode).stop?.(); } catch {} try { n.disconnect(); } catch {} });
-          try { ctx.close(); } catch {}
-        },
-      };
+      const a = new Audio(holdMusicAsset.url);
+      a.loop = true;
+      a.volume = 0.5;
+      a.crossOrigin = "anonymous";
+      void a.play().catch(() => {});
+      testHoldRef.current = a;
     } catch {}
   }, [stopTestHold]);
   useEffect(() => {
