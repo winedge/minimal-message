@@ -280,3 +280,109 @@ export function testSoftphoneWebSocket(_url: string): Promise<{
     message: "Twilio Voice SDK manages its own WebSocket — no manual probe needed.",
   });
 }
+
+/**
+ * Twilio AudioProcessor that mixes synthesized hold music with the mic input.
+ * When hold is off: mic goes to Twilio, music is silent.
+ * When hold is on: mic is muted upstream, music plays to the customer.
+ * Uses Web Audio oscillators (no external MP3 asset needed).
+ */
+class HoldMusicProcessor {
+  private ctx: AudioContext;
+  private destination: MediaStreamAudioDestinationNode | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
+  private micGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private musicNodes: AudioNode[] = [];
+  private arpTimer: number | null = null;
+
+  constructor() {
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    this.ctx = new Ctx();
+  }
+
+  async createProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    if (this.ctx.state === "suspended") { try { await this.ctx.resume(); } catch {} }
+    this.destination = this.ctx.createMediaStreamDestination();
+    this.micSource = this.ctx.createMediaStreamSource(stream);
+    this.micGain = this.ctx.createGain();
+    this.musicGain = this.ctx.createGain();
+    this.micGain.gain.value = 1;
+    this.musicGain.gain.value = 0;
+    this.micSource.connect(this.micGain).connect(this.destination);
+    this.buildMusic();
+    this.musicGain.connect(this.destination);
+    return this.destination.stream;
+  }
+
+  async destroyProcessedStream(_processed: MediaStream): Promise<void> {
+    this.stopMusic();
+    try { this.micSource?.disconnect(); } catch {}
+    try { this.micGain?.disconnect(); } catch {}
+    try { this.musicGain?.disconnect(); } catch {}
+    try { this.destination?.disconnect(); } catch {}
+    this.micSource = null;
+    this.micGain = null;
+    this.musicGain = null;
+    this.destination = null;
+  }
+
+  setHold(hold: boolean) {
+    if (!this.micGain || !this.musicGain) return;
+    const t = this.ctx.currentTime;
+    this.micGain.gain.cancelScheduledValues(t);
+    this.musicGain.gain.cancelScheduledValues(t);
+    this.micGain.gain.setTargetAtTime(hold ? 0 : 1, t, 0.03);
+    this.musicGain.gain.setTargetAtTime(hold ? 0.2 : 0, t, 0.08);
+  }
+
+  private buildMusic() {
+    if (!this.musicGain) return;
+    // Soft ambient pad: C major triad (C-E-G) with slow vibrato.
+    const chord = [261.63, 329.63, 392.0];
+    chord.forEach((f) => {
+      const o = this.ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = f;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.35;
+      o.connect(g).connect(this.musicGain!);
+      const lfo = this.ctx.createOscillator();
+      lfo.type = "sine";
+      lfo.frequency.value = 0.25;
+      const lfoGain = this.ctx.createGain();
+      lfoGain.gain.value = 1.5;
+      lfo.connect(lfoGain).connect(o.frequency);
+      o.start(); lfo.start();
+      this.musicNodes.push(o, lfo, g, lfoGain);
+    });
+    // Gentle arpeggio on top for a hold-music feel.
+    const arp = [523.25, 659.25, 783.99, 659.25];
+    let step = 0;
+    const arpGain = this.ctx.createGain();
+    arpGain.gain.value = 0;
+    arpGain.connect(this.musicGain);
+    const arpOsc = this.ctx.createOscillator();
+    arpOsc.type = "triangle";
+    arpOsc.connect(arpGain);
+    arpOsc.start();
+    this.musicNodes.push(arpOsc, arpGain);
+    const tick = () => {
+      const t = this.ctx.currentTime;
+      arpOsc.frequency.setValueAtTime(arp[step % arp.length], t);
+      arpGain.gain.cancelScheduledValues(t);
+      arpGain.gain.setValueAtTime(0.0001, t);
+      arpGain.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
+      arpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      step++;
+    };
+    tick();
+    this.arpTimer = window.setInterval(tick, 650);
+  }
+
+  private stopMusic() {
+    if (this.arpTimer) { clearInterval(this.arpTimer); this.arpTimer = null; }
+    this.musicNodes.forEach((n) => { try { (n as OscillatorNode).stop?.(); } catch {} try { n.disconnect(); } catch {} });
+    this.musicNodes = [];
+  }
+}
