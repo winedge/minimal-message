@@ -233,6 +233,7 @@ function DialerPage() {
 
 
   const testIncomingRef = useRef(false);
+  const [testInCall, setTestInCall] = useState(false);
   const testRingRef = useRef<{ ctx: AudioContext; stop: () => void } | null>(null);
   const stopTestRing = useCallback(() => {
     testRingRef.current?.stop();
