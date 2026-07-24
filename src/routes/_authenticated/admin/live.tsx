@@ -127,7 +127,7 @@ function LivePage() {
 
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {statuses.map((s) => {
+        {displayed.map((s) => {
           const call = callFor(s.user_id);
           const onCall = s.state === "on_call" && !!call;
           return (
