@@ -63,9 +63,6 @@ function AuthPage() {
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          Return <Link to="/" className="underline">home</Link>.
-        </p>
       </form>
     </div>
   );
