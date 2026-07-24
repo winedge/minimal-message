@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Mic, MicOff, Pause, Play, PhoneOff, Phone, Search, Clock, PhoneCall, CheckCircle2, Grid3x3, Delete, TrendingUp, Wifi, WifiOff, StickyNote } from "lucide-react";
+import holdMusicAsset from "@/assets/hold-music.mp3.asset.json";
 
 export const Route = createFileRoute("/_authenticated/dialer")({
   head: () => ({ meta: [{ title: "Dialer" }] }),
