@@ -6,6 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { fileURLToPath } from "node:url";
+import { VitePWA } from "vite-plugin-pwa";
 
 const eventsPolyfillPath = fileURLToPath(new URL("./src/lib/browser-events.ts", import.meta.url));
 
@@ -20,6 +21,39 @@ export default defineConfig({
           return null;
         },
       },
+      VitePWA({
+        strategies: "generateSW",
+        registerType: "autoUpdate",
+        injectRegister: null,
+        filename: "sw.js",
+        devOptions: { enabled: false },
+        manifest: false, // we ship our own public/manifest.webmanifest
+        workbox: {
+          navigateFallback: "/",
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/_serverFn/, /^\/api\//],
+          globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2}"],
+          cleanupOutdatedCaches: true,
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.mode === "navigate",
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "html-navigations",
+                networkTimeoutSeconds: 5,
+              },
+            },
+            {
+              urlPattern: ({ url, sameOrigin }) =>
+                sameOrigin && /\.(?:js|css|woff2?|svg|png|jpg|jpeg|webp|ico)$/.test(url.pathname),
+              handler: "CacheFirst",
+              options: {
+                cacheName: "static-assets",
+                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+          ],
+        },
+      }),
     ],
     resolve: {
       alias: [
