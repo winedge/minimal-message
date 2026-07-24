@@ -148,14 +148,25 @@ function OutboundPage() {
             {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
           </Button>
           {source === "twilio" && (
-            <Button
-              size="sm"
-              onClick={() => syncWebhooks.mutate()}
-              disabled={syncWebhooks.isPending}
-              title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
-            >
-              {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                onClick={() => syncWebhooks.mutate()}
+                disabled={syncWebhooks.isPending}
+                title="Set VoiceUrl + StatusCallback on every Twilio number to this app's inbound webhooks"
+              >
+                {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => syncTwiml.mutate()}
+                disabled={syncTwiml.isPending}
+                title="Point the TwiML App (used by agent softphones for outbound) at this app's /twilio-voice endpoint"
+              >
+                {syncTwiml.isPending ? "Configuring…" : "Sync TwiML App"}
+              </Button>
+            </>
           )}
         </div>
         <div className="grid gap-3 md:grid-cols-[2fr_2fr_auto]">
