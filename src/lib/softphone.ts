@@ -174,10 +174,15 @@ export class Softphone {
   // Real hold: swap mic for synthesized music via Twilio's AudioProcessor.
   // Customer hears music; agent's mic is silenced upstream. On resume, mic
   // is restored and music fades out.
-  toggleHold(): boolean {
-    if (!this.activeCall) return false;
+  toggleHold(): boolean | null {
+    if (!this.activeCall) return null;
     this.held = !this.held;
-    this.holdProcessor?.setHold(this.held);
+    if (this.holdProcessor) {
+      this.holdProcessor.setHold(this.held);
+    } else {
+      // Processor unavailable — fall back to mute so customer at least hears silence
+      try { this.activeCall.mute(this.held); } catch {}
+    }
     this.events.onHoldChange?.(this.held);
     return this.held;
   }

@@ -749,7 +749,14 @@ function DialerPage() {
                       />
                       <CircleAction
                         active={held}
-                        onClick={() => softphoneRef.current?.toggleHold()}
+                        onClick={() => {
+                          if (testInCall) { setHeld((h) => !h); return; }
+                          const result = softphoneRef.current?.toggleHold();
+                          if (result === null) {
+                            // No active call — fall back to UI-only toggle
+                            setHeld((h) => !h);
+                          }
+                        }}
                         icon={held ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
                         label={held ? "Resume" : "Hold"}
                       />
