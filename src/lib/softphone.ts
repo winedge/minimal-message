@@ -317,6 +317,8 @@ class HoldMusicProcessor {
     this.micSource.connect(this.micGain).connect(this.destination);
     this.buildMusic();
     this.musicGain.connect(this.destination);
+    // Also route music to agent's speakers so they hear what the customer hears.
+    try { this.musicGain.connect(this.ctx.destination); } catch {}
     return this.destination.stream;
   }
 
