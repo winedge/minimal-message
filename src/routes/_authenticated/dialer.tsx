@@ -613,6 +613,52 @@ function DialerPage() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-[280px_360px_1fr]">
       <section className="mx-auto w-full max-w-[380px] space-y-4 lg:order-2">
 
+        {/* Incoming caller card */}
+        {incoming && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600">Incoming call</p>
+            </div>
+            {callerInfo?.matched ? (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-base font-semibold leading-tight">
+                  {[callerInfo.first_name, callerInfo.last_name].filter(Boolean).join(" ") || "Contact"}
+                </p>
+                <p className="text-xs text-muted-foreground tabular-nums">{incoming.from}</p>
+                {callerInfo.email && (
+                  <p className="text-xs text-muted-foreground truncate">{callerInfo.email}</p>
+                )}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {callerInfo.list_name && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {callerInfo.list_name}
+                    </span>
+                  )}
+                  {callerInfo.last_called_at && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      Last call {new Date(callerInfo.last_called_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                {callerInfo.notes && (
+                  <p className="mt-1 line-clamp-3 rounded-md bg-background/60 p-2 text-xs text-muted-foreground">
+                    {callerInfo.notes}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2">
+                <p className="text-base font-semibold leading-tight">Unknown caller</p>
+                <p className="text-xs text-muted-foreground tabular-nums">{incoming.from}</p>
+                <p className="mt-1 text-xs text-muted-foreground">No matching contact in CRM.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Handset */}
         <div className="rounded-[2.5rem] border border-neutral-800 bg-neutral-900 p-4 shadow-2xl">
