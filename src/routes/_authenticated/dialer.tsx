@@ -758,7 +758,7 @@ function DialerPage() {
 
                   {/* Bottom action */}
                   <div className="mt-6 flex items-center justify-center gap-6">
-                    {incoming ? (
+                    {incoming && !testInCall ? (
                       <>
                         <button
                           onClick={rejectIncoming}
