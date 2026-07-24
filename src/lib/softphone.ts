@@ -1,6 +1,7 @@
 // Twilio Voice SDK wrapper. Keeps the same public API our dialer already uses,
 // so switching from JsSIP/Asterisk to Twilio only needs a token + a TwiML app.
 import { Device, Call } from "@twilio/voice-sdk";
+import holdMusicAsset from "@/assets/hold-music.mp3.asset.json";
 
 export type SoftphoneState =
   | "idle"
