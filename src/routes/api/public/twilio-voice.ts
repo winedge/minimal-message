@@ -88,11 +88,7 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
           return new Response(twiml, { status: 200, headers: { "Content-Type": "text/xml" } });
         }
 
-        const dedupeKey = callId
-          ? `call:${callId}`
-          : parentSid
-            ? `sid:${parentSid}`
-            : `pair:${from}->${to}`;
+        const dedupeKey = callId ? `call:${callId}` : `pair:${from}->${to}`;
         if (!claimRecentDial(dedupeKey, callId || parentSid ? CALL_DEDUPE_MS : PAIR_DEDUPE_MS)) {
           return duplicateResponse();
         }
