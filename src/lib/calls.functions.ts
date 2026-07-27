@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-function identityForExt(ext: string | number) {
-  return `ext_${ext}`;
-}
+import {
+  findRecentActiveOutboundCall,
+  identityForExt,
+  normalizeDialedNumber,
+  resolveOutboundCallerId,
+} from "@/lib/calls.server";
 
 // Issue a short-lived Twilio Voice access token for this agent. The browser
 // registers the Device with it and can receive/place calls.
@@ -66,27 +68,16 @@ export const originateCall = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const dialedNumber = data.customerPhone.replace(/[^0-9+*#]/g, "");
-    if (dialedNumber.replace(/[^0-9]/g, "").length < 3) {
-      throw new Error("Enter a valid phone number");
-    }
+    const dialedNumber = normalizeDialedNumber(data.customerPhone);
+    const callerNumber = await resolveOutboundCallerId(supabaseAdmin, data.outboundDidId);
 
-    const didQuery = data.outboundDidId
-      ? await supabaseAdmin
-          .from("outbound_dids")
-          .select("phone_number")
-          .eq("id", data.outboundDidId)
-          .maybeSingle()
-      : await supabaseAdmin
-          .from("outbound_dids")
-          .select("phone_number")
-          .eq("is_default", true)
-          .maybeSingle();
-    const callerNumber = didQuery.data?.phone_number;
-    if (!callerNumber) {
-      throw new Error(
-        "No outbound caller ID configured. Add a DID under Admin → Outbound DIDs and mark one as default.",
-      );
+    const recent = await findRecentActiveOutboundCall(
+      context.supabase,
+      context.userId,
+      dialedNumber,
+    );
+    if (recent) {
+      return { callId: recent.id, from: callerNumber, to: dialedNumber, channelId: recent.id };
     }
 
     const { data: call, error: insErr } = await context.supabase
@@ -95,7 +86,7 @@ export const originateCall = createServerFn({ method: "POST" })
         agent_id: context.userId,
         customer_phone: dialedNumber,
         direction: "outbound",
-        status: "ringing",
+        status: "dialing",
         disposition: "DIALING",
       })
       .select("id")
