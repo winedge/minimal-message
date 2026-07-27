@@ -13,7 +13,6 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
         const to = String(form.get("To") ?? "").trim();
         const from = String(form.get("From") ?? "").trim();
         const callId = String(form.get("CallId") ?? "").trim();
-        const parentSid = String(form.get("CallSid") ?? "").trim();
 
         const base = (process.env.PUBLIC_WEBHOOK_BASE_URL ?? "").replace(/\/$/, "");
         const statusUrl = `${base}/api/public/twilio-status${callId ? `?callId=${encodeURIComponent(callId)}` : ""}`;
@@ -23,19 +22,10 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
           return new Response(twiml, { status: 200, headers: { "Content-Type": "text/xml" } });
         }
 
-        // Link Twilio's parent CallSid onto our row so status callbacks correlate.
-        try {
-          if (parentSid && callId) {
-            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-            await supabaseAdmin
-              .from("calls")
-              .update({ asterisk_channel_id: parentSid })
-              .eq("id", callId);
-          }
-        } catch (e) {
-          console.error("[twilio-voice] failed to link CallSid", e);
-        }
-
+        // IMPORTANT: do NOT block the TwiML response on any external I/O.
+        // Twilio retries this webhook after ~15s of no response, which would
+        // cause the customer's phone to ring a SECOND time. Return TwiML
+        // immediately; correlation is done via callId in the status URL.
         // NOTE: no `action` attr — a non-TwiML response there ends the parent
         // leg. Status is tracked via <Number statusCallback> only.
         // NOTE: no `answerOnBridge` — with a Twilio Voice JS SDK (WebRTC)
@@ -52,6 +42,7 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
           headers: { "Content-Type": "text/xml" },
         });
       },
+
     },
   },
 });
