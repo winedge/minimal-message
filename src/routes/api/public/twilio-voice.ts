@@ -89,7 +89,7 @@ export const Route = createFileRoute("/api/public/twilio-voice")({
         }
 
         const dedupeKey = callId ? `call:${callId}` : `pair:${from}->${to}`;
-        if (!claimRecentDial(dedupeKey, callId || parentSid ? CALL_DEDUPE_MS : PAIR_DEDUPE_MS)) {
+        if (!claimRecentDial(dedupeKey, callId ? CALL_DEDUPE_MS : PAIR_DEDUPE_MS)) {
           return duplicateResponse();
         }
 
