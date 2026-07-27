@@ -47,6 +47,19 @@ async function claimCallRow(callId: string, parentSid: string) {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const marker = parentSid || `twilio-started:${Date.now()}`;
+    const { data, error } = await supabaseAdmin
+      .from("calls")
+      .update({ asterisk_channel_id: marker })
+      .eq("id", callId)
+      .is("asterisk_channel_id", null)
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      console.error("[twilio-voice] claim failed", error);
+      return true;
+    }
+    if (data?.id) return true;
+
     const { data: existing, error: readError } = await supabaseAdmin
       .from("calls")
       .select("asterisk_channel_id")
@@ -56,19 +69,7 @@ async function claimCallRow(callId: string, parentSid: string) {
       console.error("[twilio-voice] claim read failed", readError);
       return true;
     }
-    if (existing?.asterisk_channel_id) return false;
-
-    const { data, error } = await supabaseAdmin
-      .from("calls")
-      .update({ asterisk_channel_id: marker })
-      .eq("id", callId)
-      .select("id")
-      .maybeSingle();
-    if (error) {
-      console.error("[twilio-voice] claim failed", error);
-      return true;
-    }
-    return Boolean(data?.id);
+    return !existing?.asterisk_channel_id;
   } catch (e) {
     console.error("[twilio-voice] claim failed", e);
     return true;
