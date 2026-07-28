@@ -86,7 +86,7 @@ export const originateCall = createServerFn({ method: "POST" })
         agent_id: context.userId,
         customer_phone: dialedNumber,
         direction: "outbound",
-        status: "dialing",
+        status: "ringing",
         disposition: "DIALING",
       })
       .select("id")
