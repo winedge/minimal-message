@@ -50,7 +50,7 @@ export async function findRecentActiveOutboundCall(
       .eq("direction", "outbound")
       .is("ended_at", null)
       .gte("started_at", since)
-      .in("status", ["dialing", "ringing", "answered"])
+      .in("status", ["ringing", "answered"])
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
