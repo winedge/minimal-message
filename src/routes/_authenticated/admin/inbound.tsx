@@ -186,7 +186,7 @@ function InboundPage() {
                 <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
                   Loading Telnyx numbers…
                 </div>
-              ) : telnyxNumbers.error ? (
+              ) : telnyxNumbers.error || !(telnyxNumbers.data ?? []).length ? (
                 <>
                   <Input
                     placeholder="+15551234567"
@@ -194,8 +194,8 @@ function InboundPage() {
                     onChange={(e) => setEditing({ ...editing, did: e.target.value })}
                     required
                   />
-                  <p className="text-xs text-destructive">
-                    Telnyx fetch failed: {(telnyxNumbers.error as Error).message}. Enter DID manually.
+                  <p className="text-xs text-muted-foreground">
+                    No Telnyx numbers available — enter the DID manually.
                   </p>
                 </>
               ) : (
