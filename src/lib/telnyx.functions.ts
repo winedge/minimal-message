@@ -25,8 +25,8 @@ export const listTelnyxNumbers = createServerFn({ method: "GET" })
         headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
       });
       if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Telnyx API ${res.status}: ${body}`);
+        console.error(`Telnyx API ${res.status}: ${await res.text()}`);
+        return numbers; // degrade gracefully; UI allows manual DID entry
       }
       const json: any = await res.json();
       const items: any[] = json.data ?? [];
