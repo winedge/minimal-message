@@ -12,7 +12,9 @@ export const listTelnyxNumbers = createServerFn({ method: "GET" })
     if (!isAdmin) throw new Error("Forbidden");
 
     const key = process.env.TELNYX_API_KEY;
-    if (!key) throw new Error("TELNYX_API_KEY not configured");
+    // Telnyx is optional (Twilio is the primary provider) — never throw, just
+    // return an empty list so the UI falls back to manual DID entry.
+    if (!key) return [];
 
     const numbers: { phone_number: string; status: string | null; tag: string | null }[] = [];
     let page = 1;
@@ -23,8 +25,8 @@ export const listTelnyxNumbers = createServerFn({ method: "GET" })
         headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
       });
       if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Telnyx API ${res.status}: ${body}`);
+        console.error(`Telnyx API ${res.status}: ${await res.text()}`);
+        return numbers; // degrade gracefully; UI allows manual DID entry
       }
       const json: any = await res.json();
       const items: any[] = json.data ?? [];
