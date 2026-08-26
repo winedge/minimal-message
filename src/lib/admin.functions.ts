@@ -65,8 +65,16 @@ export const listAgents = createServerFn({ method: "GET" })
     const { data: sips } = await supabaseAdmin
       .from("sip_endpoints")
       .select("user_id, sip_username, extension");
+    let emails: Record<string, string> = {};
+    try {
+      const { data: users } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      emails = Object.fromEntries((users?.users ?? []).map((u: any) => [u.id, u.email ?? ""]));
+    } catch {
+      emails = {};
+    }
     return (profiles ?? []).map((p: any) => ({
       ...p,
+      email: emails[p.id] ?? null,
       role:
         roles?.find((r: any) => r.user_id === p.id && r.role === "admin")
           ? "admin"
@@ -76,6 +84,54 @@ export const listAgents = createServerFn({ method: "GET" })
       sip: sips?.find((s: any) => s.user_id === p.id) ?? null,
     }));
   });
+
+// Change a user's role (admin/agent). Cannot demote yourself or the last admin.
+export const setUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({ userId: z.string().uuid(), role: z.enum(["admin", "agent"]) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.role !== "admin") {
+      if (data.userId === context.userId) throw new Error("You cannot remove your own admin role");
+      const { count } = await supabaseAdmin
+        .from("user_roles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin");
+      if ((count ?? 0) <= 1) throw new Error("At least one admin must remain");
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.userId);
+    if (delErr) throw new Error(delErr.message);
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: data.userId, role: data.role });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// Set a new password for a user (admin only).
+export const setUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({ userId: z.string().uuid(), password: z.string().min(8).max(128) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.password,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const setAgentDisabled = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
