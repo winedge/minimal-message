@@ -58,6 +58,30 @@ function AgentsPage() {
     onError: (e: any) => toast.error(e.message ?? "Failed"),
   });
 
+  const changeRole = useServerFn(setUserRole);
+  const changePassword = useServerFn(setUserPassword);
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+
+  const roleMut = useMutation({
+    mutationFn: async (v: { userId: string; role: "admin" | "agent" }) => changeRole({ data: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      toast.success("Role updated");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed"),
+  });
+
+  const pwMut = useMutation({
+    mutationFn: async (v: { userId: string; password: string }) => changePassword({ data: v }),
+    onSuccess: () => {
+      setResetFor(null);
+      setNewPassword("");
+      toast.success("Password updated");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed"),
+  });
+
   if (role !== "admin") {
     return (
       <div className="space-y-4 rounded border p-6">
