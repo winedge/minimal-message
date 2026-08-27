@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteInboundRoute, upsertInboundRoute } from "@/lib/inbound.functions";
 import { listTelnyxNumbers } from "@/lib/telnyx.functions";
+import { listTwilioNumbers, syncTwilioWebhooks } from "@/lib/twilio.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/inbound")({
@@ -33,8 +34,11 @@ function InboundPage() {
   const upsert = useServerFn(upsertInboundRoute);
   const remove = useServerFn(deleteInboundRoute);
   const fetchTelnyx = useServerFn(listTelnyxNumbers);
+  const fetchTwilio = useServerFn(listTwilioNumbers);
+  const syncHooks = useServerFn(syncTwilioWebhooks);
 
   const [editing, setEditing] = useState<Partial<Route> | null>(null);
+  const [source, setSource] = useState<"twilio" | "telnyx">("twilio");
 
   const routes = useQuery({
     queryKey: ["inbound_routes"],
@@ -49,20 +53,41 @@ function InboundPage() {
   });
 
   const agents = useQuery({
-    queryKey: ["agents-with-sip"],
+    queryKey: ["agents-all"],
     queryFn: async () => {
-      const { data: p } = await supabase.from("profiles").select("id, full_name");
-      const { data: s } = await supabase.from("sip_endpoints").select("user_id");
-      const allowed = new Set((s ?? []).map((r: any) => r.user_id));
-      return (p ?? []).filter((row: any) => allowed.has(row.id)) as Agent[];
+      const { data, error } = await supabase.from("profiles").select("id, full_name");
+      if (error) throw error;
+      return (data ?? []) as Agent[];
     },
   });
 
   const telnyxNumbers = useQuery({
     queryKey: ["telnyx-numbers"],
     queryFn: () => fetchTelnyx(),
+    enabled: source === "telnyx",
     staleTime: 60_000,
     retry: false,
+  });
+
+  const twilioNumbers = useQuery({
+    queryKey: ["twilio-numbers"],
+    queryFn: () => fetchTwilio(),
+    enabled: source === "twilio",
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const providerQuery = source === "twilio" ? twilioNumbers : telnyxNumbers;
+
+  const syncWebhooks = useMutation({
+    mutationFn: async () => syncHooks({ data: {} }),
+    onSuccess: (r: any) => {
+      const failed = r?.failed?.length ?? 0;
+      if (failed > 0) toast.warning(`Updated ${r.updated} number(s); ${failed} failed`);
+      else toast.success(`Synced inbound webhooks on ${r.updated} Twilio number(s)`);
+      twilioNumbers.refetch();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
   });
 
   const saveMut = useMutation({
@@ -181,12 +206,50 @@ function InboundPage() {
           <h2 className="font-semibold">{editing.id ? "Edit route" : "New route"}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label>DID (from Telnyx)</Label>
-              {telnyxNumbers.isLoading ? (
-                <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
-                  Loading Telnyx numbers…
+              <Label>DID (from {source === "twilio" ? "Twilio" : "Telnyx"})</Label>
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <div className="inline-flex overflow-hidden rounded border">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-xs ${source === "twilio" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+                    onClick={() => setSource("twilio")}
+                  >
+                    Twilio
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-xs ${source === "telnyx" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+                    onClick={() => setSource("telnyx")}
+                  >
+                    Telnyx
+                  </button>
                 </div>
-              ) : telnyxNumbers.error || !(telnyxNumbers.data ?? []).length ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => providerQuery.refetch()}
+                  disabled={providerQuery.isFetching}
+                >
+                  {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
+                </Button>
+                {source === "twilio" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => syncWebhooks.mutate()}
+                    disabled={syncWebhooks.isPending}
+                    title="Point every Twilio number's VoiceUrl at this app's inbound webhook"
+                  >
+                    {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+                  </Button>
+                )}
+              </div>
+              {providerQuery.isLoading ? (
+                <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
+                  Loading numbers…
+                </div>
+              ) : providerQuery.error || !(providerQuery.data ?? []).length ? (
                 <>
                   <Input
                     placeholder="+15551234567"
@@ -195,7 +258,7 @@ function InboundPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    No Telnyx numbers available — enter the DID manually.
+                    No {source === "twilio" ? "Twilio" : "Telnyx"} numbers available — enter the DID manually.
                   </p>
                 </>
               ) : (
@@ -206,12 +269,11 @@ function InboundPage() {
                   required
                 >
                   <option value="">— choose number —</option>
-                  {/* keep current value visible even if not in list (e.g. released number) */}
                   {editing.did &&
-                    !(telnyxNumbers.data ?? []).some((n) => n.phone_number === editing.did) && (
-                      <option value={editing.did}>{editing.did} (not in Telnyx)</option>
+                    !(providerQuery.data ?? []).some((n: any) => n.phone_number === editing.did) && (
+                      <option value={editing.did}>{editing.did} (not in provider)</option>
                     )}
-                  {(telnyxNumbers.data ?? []).map((n) => (
+                  {(providerQuery.data ?? []).map((n: any) => (
                     <option key={n.phone_number} value={n.phone_number}>
                       {n.phone_number}
                       {n.tag ? ` — ${n.tag}` : ""}
