@@ -206,12 +206,50 @@ function InboundPage() {
           <h2 className="font-semibold">{editing.id ? "Edit route" : "New route"}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label>DID (from Telnyx)</Label>
-              {telnyxNumbers.isLoading ? (
-                <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
-                  Loading Telnyx numbers…
+              <Label>DID (from {source === "twilio" ? "Twilio" : "Telnyx"})</Label>
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <div className="inline-flex overflow-hidden rounded border">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-xs ${source === "twilio" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+                    onClick={() => setSource("twilio")}
+                  >
+                    Twilio
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-xs ${source === "telnyx" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+                    onClick={() => setSource("telnyx")}
+                  >
+                    Telnyx
+                  </button>
                 </div>
-              ) : telnyxNumbers.error || !(telnyxNumbers.data ?? []).length ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => providerQuery.refetch()}
+                  disabled={providerQuery.isFetching}
+                >
+                  {providerQuery.isFetching ? "Syncing…" : "Sync numbers"}
+                </Button>
+                {source === "twilio" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => syncWebhooks.mutate()}
+                    disabled={syncWebhooks.isPending}
+                    title="Point every Twilio number's VoiceUrl at this app's inbound webhook"
+                  >
+                    {syncWebhooks.isPending ? "Configuring…" : "Sync webhooks to Twilio"}
+                  </Button>
+                )}
+              </div>
+              {providerQuery.isLoading ? (
+                <div className="rounded-md border bg-muted px-2 py-2 text-sm text-muted-foreground">
+                  Loading numbers…
+                </div>
+              ) : providerQuery.error || !(providerQuery.data ?? []).length ? (
                 <>
                   <Input
                     placeholder="+15551234567"
@@ -220,7 +258,7 @@ function InboundPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    No Telnyx numbers available — enter the DID manually.
+                    No {source === "twilio" ? "Twilio" : "Telnyx"} numbers available — enter the DID manually.
                   </p>
                 </>
               ) : (
@@ -231,12 +269,11 @@ function InboundPage() {
                   required
                 >
                   <option value="">— choose number —</option>
-                  {/* keep current value visible even if not in list (e.g. released number) */}
                   {editing.did &&
-                    !(telnyxNumbers.data ?? []).some((n) => n.phone_number === editing.did) && (
-                      <option value={editing.did}>{editing.did} (not in Telnyx)</option>
+                    !(providerQuery.data ?? []).some((n: any) => n.phone_number === editing.did) && (
+                      <option value={editing.did}>{editing.did} (not in provider)</option>
                     )}
-                  {(telnyxNumbers.data ?? []).map((n) => (
+                  {(providerQuery.data ?? []).map((n: any) => (
                     <option key={n.phone_number} value={n.phone_number}>
                       {n.phone_number}
                       {n.tag ? ` — ${n.tag}` : ""}
