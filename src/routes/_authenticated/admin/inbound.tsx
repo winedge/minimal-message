@@ -53,20 +53,41 @@ function InboundPage() {
   });
 
   const agents = useQuery({
-    queryKey: ["agents-with-sip"],
+    queryKey: ["agents-all"],
     queryFn: async () => {
-      const { data: p } = await supabase.from("profiles").select("id, full_name");
-      const { data: s } = await supabase.from("sip_endpoints").select("user_id");
-      const allowed = new Set((s ?? []).map((r: any) => r.user_id));
-      return (p ?? []).filter((row: any) => allowed.has(row.id)) as Agent[];
+      const { data, error } = await supabase.from("profiles").select("id, full_name");
+      if (error) throw error;
+      return (data ?? []) as Agent[];
     },
   });
 
   const telnyxNumbers = useQuery({
     queryKey: ["telnyx-numbers"],
     queryFn: () => fetchTelnyx(),
+    enabled: source === "telnyx",
     staleTime: 60_000,
     retry: false,
+  });
+
+  const twilioNumbers = useQuery({
+    queryKey: ["twilio-numbers"],
+    queryFn: () => fetchTwilio(),
+    enabled: source === "twilio",
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const providerQuery = source === "twilio" ? twilioNumbers : telnyxNumbers;
+
+  const syncWebhooks = useMutation({
+    mutationFn: async () => syncHooks({ data: {} }),
+    onSuccess: (r: any) => {
+      const failed = r?.failed?.length ?? 0;
+      if (failed > 0) toast.warning(`Updated ${r.updated} number(s); ${failed} failed`);
+      else toast.success(`Synced inbound webhooks on ${r.updated} Twilio number(s)`);
+      twilioNumbers.refetch();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to sync webhooks"),
   });
 
   const saveMut = useMutation({
