@@ -61,25 +61,53 @@ export const Route = createFileRoute("/api/public/twilio-inbound")({
           console.error("[twilio-inbound] callback lookup failed", e);
         }
 
-        // 2) Fallback: DID → agent extension mapping.
+        // 2) Fallback: DID → agent mapping from `inbound_routes`.
+        let ringUserIds: string[] = [];
+        let ringSeconds = 25;
+        let fallbackExtension: string | null = null;
+
         if (!agentExt) {
-          const { data: route } = await supabaseAdmin
-            .from("inbound_routes")
-            .select("agent_ext")
-            .eq("did", to)
-            .maybeSingle();
-          if (route?.agent_ext) {
-            agentExt = String(route.agent_ext);
-            const { data: sip } = await supabaseAdmin
-              .from("sip_endpoints")
-              .select("user_id")
-              .eq("extension", agentExt)
-              .maybeSingle();
-            agentUserId = sip?.user_id ?? null;
+          try {
+            const { data: routes, error } = await supabaseAdmin
+              .from("inbound_routes")
+              .select("did, strategy, target_user_id, ring_group, ring_seconds, fallback_extension");
+            if (error) throw error;
+            const toTail = last10(to);
+            const route =
+              (routes ?? []).find((r: any) => r.did === to) ??
+              (routes ?? []).find((r: any) => toTail && last10(String(r.did ?? "")) === toTail);
+            if (route) {
+              ringSeconds = Number(route.ring_seconds) || 25;
+              fallbackExtension = route.fallback_extension ?? null;
+              const group = Array.isArray(route.ring_group) ? route.ring_group : [];
+              ringUserIds =
+                route.strategy === "roundrobin" && group.length
+                  ? group.map(String)
+                  : route.target_user_id
+                    ? [String(route.target_user_id)]
+                    : group.map(String);
+            }
+          } catch (e) {
+            console.error("[twilio-inbound] route lookup failed", e);
           }
         }
 
-        if (!agentExt) {
+        // Resolve extensions for the target agent(s).
+        let extensions: string[] = [];
+        if (agentExt) {
+          extensions = [agentExt];
+        } else if (ringUserIds.length) {
+          const { data: sips } = await supabaseAdmin
+            .from("sip_endpoints")
+            .select("user_id, extension")
+            .in("user_id", ringUserIds);
+          extensions = (sips ?? []).map((s: any) => String(s.extension));
+          agentUserId = (sips ?? [])[0]?.user_id ?? null;
+        }
+        if (!extensions.length && fallbackExtension) extensions = [String(fallbackExtension)];
+
+        if (!extensions.length) {
+          console.error("[twilio-inbound] no route for DID", to);
           const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say>No agent is available right now. Please call back later.</Say></Response>`;
           return new Response(twiml, { headers: { "Content-Type": "text/xml" } });
         }
@@ -99,14 +127,17 @@ export const Route = createFileRoute("/api/public/twilio-inbound")({
           console.error("[twilio-inbound] insert call row failed", e);
         }
 
-        const identity = `ext_${agentExt}`;
+        const clients = extensions
+          .map((ext) => `    <Client>${esc(`ext_${ext}`)}</Client>`)
+          .join("\n");
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="25" answerOnBridge="true" callerId="${esc(from)}">
-    <Client>${esc(identity)}</Client>
+  <Dial timeout="${ringSeconds}" answerOnBridge="true" callerId="${esc(from)}">
+${clients}
   </Dial>
 </Response>`;
         return new Response(twiml, { headers: { "Content-Type": "text/xml" } });
+
       },
     },
   },
